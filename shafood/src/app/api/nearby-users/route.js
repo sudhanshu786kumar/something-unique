@@ -20,6 +20,8 @@ export async function GET(request) {
   try {
     const { db } = await connectToDatabase();
 
+    console.log(`Searching for users near lat: ${lat}, lng: ${lng}`);
+
     const nearbyUsers = await db.collection('users').find({
       _id: { $ne: session.user.id },
       isSharing: true,
@@ -29,10 +31,12 @@ export async function GET(request) {
             type: "Point",
             coordinates: [lng, lat]
           },
-          $maxDistance: 5000 // 5km radius
+          $maxDistance: 10000 // 10km radius
         }
       }
-    }).limit(10).toArray();
+    }).toArray();
+
+    console.log(`Found ${nearbyUsers.length} nearby users`);
 
     const sanitizedUsers = nearbyUsers.map(user => ({
       id: user._id.toString(),
@@ -45,6 +49,6 @@ export async function GET(request) {
     return NextResponse.json(sanitizedUsers);
   } catch (error) {
     console.error('Error fetching nearby users:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getUserByEmail } from '@/app/models/User';
 import bcrypt from 'bcryptjs';
+import { initDatabase } from '@/app/lib/init-db';
 
 const authOptions = {
   providers: [
@@ -50,6 +51,8 @@ const authOptions = {
     signIn: '/login',
   },
 };
+
+initDatabase().catch(console.error);
 
 const handler = NextAuth(authOptions);
 

@@ -40,6 +40,7 @@ export async function updateUser(id, updateData) {
       } 
     }
   );
+  console.log(`User update result for user ${id}:`, result);
   return result.modifiedCount > 0;
 }
 
@@ -58,5 +59,12 @@ export async function setUserLocation(id, lat, lng) {
       } 
     }
   );
+  console.log(`Location update result for user ${id}:`, result);
   return result.modifiedCount > 0;
+}
+
+export async function createGeospatialIndex() {
+  const client = await clientPromise;
+  const db = client.db();
+  await db.collection('users').createIndex({ location: "2dsphere" });
 }

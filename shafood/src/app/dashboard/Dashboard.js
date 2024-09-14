@@ -10,6 +10,7 @@ import OrderForm from '../components/OrderForm';
 import UserList from '../components/UserList';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import LocationSharing from '../components/LocationSharing';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -101,19 +102,15 @@ export default function Dashboard() {
                     </a>
                   )}
                 </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
+                <button
                       onClick={handleSignOut}
                       className={classNames(
-                        active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                       true ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
                         'block w-full text-left px-4 py-2 text-sm'
                       )}
                     >
                       Sign out
                     </button>
-                  )}
-                </Menu.Item>
               </div>
             </Transition>
           </Menu>
@@ -129,6 +126,7 @@ export default function Dashboard() {
         >
           <h2 className="text-2xl font-semibold mb-4 text-orange-600">Welcome, {session.user.name}!</h2>
           <p className="text-gray-600">Ready to share some delicious food with nearby friends?</p>
+          <LocationSharing />
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -19,19 +19,22 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         router.push('/login');
       } else {
-        const data = await response.json();
-        setError(data.message || 'Registration failed. Please try again.');
+        setError(data.error || 'Registration failed. Please try again.');
+        console.error('Registration error details:', data.details);
       }
     } catch (error) {
+      console.error('Registration error:', error);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
