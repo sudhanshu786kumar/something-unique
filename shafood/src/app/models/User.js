@@ -44,27 +44,9 @@ export async function updateUser(id, updateData) {
   return result.modifiedCount > 0;
 }
 
-export async function setUserLocation(id, lat, lng) {
+export async function getAllUsers() {
   const client = await clientPromise;
   const db = client.db();
-  const result = await db.collection('users').updateOne(
-    { _id: new ObjectId(id) },
-    { 
-      $set: { 
-        location: {
-          type: "Point",
-          coordinates: [lng, lat]
-        },
-        updatedAt: new Date()
-      } 
-    }
-  );
-  console.log(`Location update result for user ${id}:`, result);
-  return result.modifiedCount > 0;
+  return db.collection('users').find({}).toArray();
 }
 
-export async function createGeospatialIndex() {
-  const client = await clientPromise;
-  const db = client.db();
-  await db.collection('users').createIndex({ location: "2dsphere" });
-}

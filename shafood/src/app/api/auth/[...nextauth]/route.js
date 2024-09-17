@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { getUserByEmail } from '@/app/models/User';
 import bcrypt from 'bcryptjs';
 import { initDatabase } from '@/app/lib/init-db';
+import { createGeospatialIndex } from '@/app/models/User';
 
 const authOptions = {
   providers: [
@@ -45,6 +46,11 @@ const authOptions = {
     async signOut({ token, session }) {
       // Perform any additional sign-out actions here
       return true;
+    },
+  },
+  events: {
+    async signIn(message) {
+      await createGeospatialIndex();
     },
   },
   pages: {
