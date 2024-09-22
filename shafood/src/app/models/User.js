@@ -9,6 +9,7 @@ export async function createUser(userData) {
     isSharing: false,
     isOrdering: false,
     location: null,
+    online: false, // Default to offline
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -28,6 +29,7 @@ export async function getUserById(id) {
   return db.collection('users').findOne({ _id: new ObjectId(id) });
 }
 
+// Add this function to update the online status
 export async function updateUser(id, updateData) {
   const client = await clientPromise;
   const db = client.db();
@@ -40,7 +42,6 @@ export async function updateUser(id, updateData) {
       } 
     }
   );
-  console.log(`User update result for user ${id}:`, result);
   return result.modifiedCount > 0;
 }
 
@@ -49,4 +50,24 @@ export async function getAllUsers() {
   const db = client.db();
   return db.collection('users').find({}).toArray();
 }
+
+// Define the updateUserPreferences function
+export const updateUserPreferences = async (userId, preferences) => {
+  const client=await clientPromise;
+  const db = client.db();
+  const userCollection = db.collection('users');
+  const result = await userCollection.updateOne(
+    { _id: new ObjectId(userId) },
+    { 
+      $set: { 
+        ...preferences,
+        preferences: preferences
+      } 
+    } // Assuming preferences is an object containing user preferences
+  );
+  return result;
+};
+
+// Ensure you export the function
+
 

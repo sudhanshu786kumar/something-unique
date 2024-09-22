@@ -3,10 +3,21 @@ import { useSession } from 'next-auth/react';
 import useLocation from '../hooks/useGeolocation';
 import CuteMap from './CuteMap';
 import { motion } from 'framer-motion';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
+import Loader from './Loader';
+import PreferencesModal from './PreferencesModal';
+import { toast } from 'react-toastify';
 
-const LocationTracker = () => {
+const LocationTracker = ({ preferences, onUpdate }) => {
   const [location, setLocation] = useState(null);
-  const [userLocations, setUserLocations] = useState([]);
+  const [loadingLocation, setLoadingLocation] = useState(true);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const [nearbyUsers, setNearbyUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [preferencesUpdated, setPreferencesUpdated] = useState(false);
+  const [showNearbyUsers, setShowNearbyUsers] = useState(false);
+// State for chatId
   const { data: session } = useSession();
   useLocation(); // Use the location hook
 
@@ -17,6 +28,7 @@ const LocationTracker = () => {
       const data = JSON.parse(event.data);
       if (data.userId === session?.user?.id) {
         setLocation(data);
+        setLoadingLocation(false); // Stop loading when location is set
       }
     };
 
@@ -25,72 +37,98 @@ const LocationTracker = () => {
     };
   }, [session]);
 
-  const fetchUserLocations = async () => {
-    try {
-      const response = await fetch('/api/users/locations');
-      if (!response.ok) {
-        throw new Error('Failed to fetch user locations');
-      }
+  const handlePreferencesUpdate = (newPreferences) => {
+    onUpdate(newPreferences); // Call the onUpdate function passed from the parent
+    setPreferencesModalOpen(false); // Close the modal after updating
+    setPreferencesUpdated(true); // Set preferencesUpdated to true
+  };
+
+  const fetchNearbyUsers = async () => {
+    if (location) {
+      const response = await fetch(`/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}`);
       const data = await response.json();
-      setUserLocations(data);
-    } catch (error) {
-      console.error('Error fetching user locations:', error);
+      if (response.ok) {
+        setNearbyUsers(data);
+        setShowNearbyUsers(true); // Show nearby users after fetching
+        console.log(data)
+      } else {
+        console.error(data.error);
+      }
     }
   };
 
+  const toggleUserSelection = (userId) => {
+    setSelectedUsers((prevSelected) => {
+      if (prevSelected.includes(userId)) {
+        return prevSelected.filter((id) => id !== userId);
+      } else {
+        return [...prevSelected, userId];
+      }
+    });
+  };
+
+
   return (
     <div className="flex flex-col items-center">
-      {location ? (
+      {loadingLocation ? (
+        <Loader size="h-16 w-16" />
+      ) : location ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="flex flex-col items-center"
         >
-          <h2 className="text-2xl font-bold mb-4 text-orange-600">Your Current Location</h2>
+          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-600 text-4xl mb-4 animate-bounce" />
           <CuteMap latitude={location.latitude} longitude={location.longitude} />
+          <motion.button 
+            onClick={() => setPreferencesModalOpen(true)} // Open the preferences modal
+            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300"
+          >
+            Add Your Preferences
+          </motion.button>
+          {preferencesUpdated && ( // Conditionally render the Search Nearby button
+            <button 
+              onClick={fetchNearbyUsers} // Fetch nearby users
+              className="mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300"
+            >
+              Search Nearby
+            </button>
+          )}
+          <PreferencesModal
+            isOpen={preferencesModalOpen}
+            onClose={() => setPreferencesModalOpen(false)}
+            onUpdate={handlePreferencesUpdate}
+            userLocation={location} // Pass user location to PreferencesModal
+          />
+          {showNearbyUsers && ( // Conditionally render nearby users
+            <>
+              <h3 className="mt-4 text-lg font-bold">Nearby Users:</h3>
+              <ul className="mt-2">
+                {nearbyUsers.map(user => (
+                  <li key={user.id} className="border-b py-2 flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => toggleUserSelection(user.id)}
+                      className="mr-2"
+                    />
+                    {user.name} - {user.distance.toFixed(2)} km away
+                    {user.preferredProviders.length > 0 && (
+                      <span className="ml-2 text-sm text-gray-600">
+                        (Preferred: {user.preferredProviders.join(', ')})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            
+            </>
+          )}
+         
         </motion.div>
       ) : (
         <p className="text-lg text-gray-600">No location data available.</p>
-      )}
-
-      <motion.button 
-        onClick={fetchUserLocations} 
-        className="mt-8 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 transform hover:scale-105"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        Check All Users' Locations
-      </motion.button>
-
-      {userLocations.length > 0 && (
-        <motion.div 
-          className="mt-8 w-full max-w-md"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <h3 className="text-xl font-bold mb-4 text-orange-600">All Users' Locations:</h3>
-          <ul className="bg-white rounded-lg shadow-md overflow-hidden">
-            {userLocations.map(user => (
-              <motion.li 
-                key={user.id} 
-                className="px-4 py-3 border-b last:border-b-0 hover:bg-orange-50 transition duration-150"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <span className="font-semibold text-gray-700">{user.name}:</span>
-                {user.location ? (
-                  <span className="ml-2 text-gray-600">
-                    Lat: {user.location.latitude.toFixed(4)}, Lon: {user.location.longitude.toFixed(4)}
-                  </span>
-                ) : (
-                  <span className="ml-2 text-gray-500 italic">Location not available</span>
-                )}
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
       )}
     </div>
   );

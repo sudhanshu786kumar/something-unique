@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { getUserByEmail } from '@/app/models/User';
+import { getUserByEmail, updateUser } from '@/app/models/User'; // Import updateUser
 import bcrypt from 'bcryptjs';
 import { initDatabase } from '@/app/lib/init-db';
 import { createGeospatialIndex } from '@/app/models/User';
@@ -25,6 +25,10 @@ const authOptions = {
         if (!isPasswordValid) {
           return null;
         }
+        
+        // Set user online status
+        await updateUser(user._id, { online: true }); // Update online status on login
+
         return { id: user._id.toString(), email: user.email, name: user.name };
       }
     })
@@ -43,8 +47,9 @@ const authOptions = {
       session.user.id = token.id;
       return session;
     },
-    async signOut({ token, session }) {
-      // Perform any additional sign-out actions here
+    async signOut({ token }) {
+      // Set user offline status on logout
+      await updateUser(token.id, { online: false }); // Update online status on logout
       return true;
     },
   },

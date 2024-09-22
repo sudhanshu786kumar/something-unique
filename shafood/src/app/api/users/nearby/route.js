@@ -18,23 +18,23 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const latitude = parseFloat(searchParams.get('latitude'));
   const longitude = parseFloat(searchParams.get('longitude'));
-  const radius = parseFloat(searchParams.get('radius'));
+  const radius = parseFloat(searchParams.get('radius')) || 7; // Default to 7 km
 
-  if (isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
+  if (isNaN(latitude) || isNaN(longitude)) {
     return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
   }
 
   const users = await getAllUsers();
   
   const nearbyUsers = users
-    .filter(user => user.location)
+    .filter(user => user.location && user.online) // Check if user is online and has a location
     .map(user => ({
       id: user._id,
       name: user.name,
-      online: user.online || false,
-      distance: calculateDistance(latitude, longitude, user.location.latitude, user.location.longitude)
+      distance: calculateDistance(latitude, longitude, user.location.latitude, user.location.longitude),
+      preferredProviders: user.foodProviders || [] // Include preferred providers
     }))
-    .filter(user => user.distance <= radius)
+    .filter(user => user.distance <= radius) // Filter by distance
     .sort((a, b) => a.distance - b.distance);
 
   return NextResponse.json(nearbyUsers);
