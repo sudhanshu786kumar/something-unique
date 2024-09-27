@@ -15,11 +15,23 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [nearbyUsers, setNearbyUsers] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]); // Initialize selectedUsers
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
   const [showNearbyUsers, setShowNearbyUsers] = useState(false);
   const { data: session } = useSession();
   useLocation();
+
+  useEffect(() => {
+    // Always include the logged-in user in selectedUsers
+    if (session?.user) {
+      setSelectedUsers((prev) => {
+        if (!prev.some((user) => user.id === session.user.id)) {
+          return [...prev, { id: session.user.id, name: session.user.name }];
+        }
+        return prev;
+      });
+    }
+  }, [session]);
 
   useEffect(() => {
     const eventSource = new EventSource('/api/stream');
@@ -60,6 +72,10 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     setSelectedUsers((prevSelected) => {
       const isSelected = prevSelected.some((u) => u.id === user.id);
       if (isSelected) {
+        // Prevent deselecting the logged-in user
+        if (user.id === session.user.id) {
+          return prevSelected; // Do not remove the logged-in user
+        }
         return prevSelected.filter((u) => u.id !== user.id);
       } else {
         return [...prevSelected, { id: user.id, name: user.name }];
@@ -104,22 +120,24 @@ const LocationTracker = ({ preferences, onUpdate }) => {
             <>
               <h3 className="mt-4 text-lg font-bold">Nearby Users:</h3>
               <ul className="mt-2">
-                {nearbyUsers.map(user => (
-                  <li key={user.id} className="border-b py-2 flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.some((u) => u.id === user.id)}
-                      onChange={() => toggleUserSelection(user)}
-                      className="mr-2"
-                    />
-                    {user.name} - {user.distance.toFixed(2)} km away
-                    {user.preferredProviders.length > 0 && (
-                      <span className="ml-2 text-sm text-gray-600">
-                        (Preferred: {user.preferredProviders.join(', ')})
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {nearbyUsers
+                  .filter(user => user.id !== session.user.id) // Filter out the logged-in user
+                  .map(user => (
+                    <li key={user.id} className="border-b py-2 flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.some((u) => u.id === user.id)}
+                        onChange={() => toggleUserSelection(user)}
+                        className="mr-2"
+                      />
+                      {user.name} - {user.distance.toFixed(2)} km away
+                      {user.preferredProviders.length > 0 && (
+                        <span className="ml-2 text-sm text-gray-600">
+                          (Preferred: {user.preferredProviders.join(', ')})
+                        </span>
+                      )}
+                    </li>
+                  ))}
               </ul>
             </>
           )}
