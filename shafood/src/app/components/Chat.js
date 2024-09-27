@@ -110,10 +110,6 @@ const Chat = ({ selectedUsers }) => {
         if (!response.ok) {
           throw new Error('Failed to send message');
         }
-
-        // Optionally, you can handle the response if needed
-        // const sentMessage = await response.json();
-        // Here you can update the message with the ID returned from the server if needed
       } catch (error) {
         console.error('Error sending message:', error);
         // Optionally, you can revert the optimistic update if the send fails
@@ -155,7 +151,7 @@ const Chat = ({ selectedUsers }) => {
   return (
     <div className="flex flex-col h-full p-4 bg-white rounded-lg shadow-md">
       <h2 className="text-xl font-semibold mb-4">Chat with Selected Users</h2>
-      <div className="flex-1 overflow-y-auto mb-4 max-h-[300px]"> {/* Set max height for scrollable area */}
+      <div className="flex-1 overflow-y-auto mb-4 max-h-[200px]"> {/* Set max height for scrollable area */}
         {loadingMessages ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, index) => (
@@ -170,6 +166,11 @@ const Chat = ({ selectedUsers }) => {
               </div>
             ))}
           </div>
+        ) : messages.length === 0 ? (
+          <div className="text-center text-gray-500">
+            <p className="text-lg">Start a new chat!</p>
+            <p className="text-sm">Send a message to begin the conversation.</p>
+          </div>
         ) : (
           messages.map((msg, index) => (
             <div key={index} className={`mb-2 flex items-center ${msg.sender === session.user.name ? 'justify-end' : 'justify-start'}`}>
@@ -183,7 +184,6 @@ const Chat = ({ selectedUsers }) => {
                 <span>{msg.text}</span>
                 <div className="flex space-x-2 mt-1">
                   <button onClick={() => addReaction(index, '👍')} className="text-sm">👍</button>
-
                 </div>
                 {msg.reactions && msg.reactions.length > 0 && (
                   <div className="text-gray-500 text-sm">
