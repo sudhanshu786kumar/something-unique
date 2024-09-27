@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sendMessageToChat } from '@/app/models/Chat'; // Adjust the import based on your project structure
 
 export async function POST(request) {
-  const { message, sender, chatId } = await request.json();
+  const { message, sender, chatId,id } = await request.json();
 
   if (!message || !sender || !chatId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -10,7 +10,7 @@ export async function POST(request) {
 
   try {
     // Send the message to the chat
-    const sentMessage = await sendMessageToChat(chatId, message,sender);
+    const sentMessage = await sendMessageToChat(chatId, message,sender, id);
 
     // Return the sent message as a response
     return NextResponse.json(sentMessage, { status: 200 });

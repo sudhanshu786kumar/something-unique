@@ -49,12 +49,12 @@ export const getChatMessages = async (chatId) => {
     return chat ? chat.messages: [];
 };
 
-export const sendMessageToChat = async (chatId, text, sender) => {
+export const sendMessageToChat = async (chatId, text, sender, id) => {
     const client = await clientPromise;
     const db = client.db();
     const chatCollection = db.collection('chats');
 
-    const message = { text, sender, createdAt: new Date() }; // Adjust sender as needed
+    const message = { id, text, sender, createdAt: new Date() }; // Include the unique ID
 
     // Convert chatId to ObjectId using 'new'
     const chatObjectId = typeof chatId === 'string' ? new ObjectId(chatId) : chatId;
@@ -72,11 +72,6 @@ export const sendMessageToChat = async (chatId, text, sender) => {
             { $push: { messages: message } } // Push the new message to the messages array
         );
 
-        console.log('Update result:', result);
-        if (result.modifiedCount === 0) {
-            console.warn('No documents were modified. Check if the chatId is correct and if the message is being pushed correctly.');
-        }
-
         // Notify clients about the new message using Pusher
         const pusher = new Pusher({
             appId: process.env.NEXT_PUBLIC_PUSHER_APP_ID,
@@ -89,7 +84,7 @@ export const sendMessageToChat = async (chatId, text, sender) => {
         // Trigger the event to notify other users
         await pusher.trigger(`chat-${chatObjectId}`, 'new-message', message);
 
-        return message;
+        return message; // Return the message with the unique ID
     } catch (error) {
         console.error('Error sending message:', error);
         throw new Error('Failed to send message'); // Rethrow the error for the API route to catch

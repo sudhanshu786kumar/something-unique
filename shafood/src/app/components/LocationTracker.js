@@ -123,7 +123,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
               </ul>
             </>
           )}
-          {selectedUsers.length > 0 && <Chat selectedUsers={selectedUsers} />} {/* Render Chat component */}
+          {selectedUsers.length >= 2 && <Chat selectedUsers={selectedUsers} />} {/* Render Chat component */}
         </motion.div>
       ) : (
         <p className="text-lg text-gray-600">No location data available.</p>
