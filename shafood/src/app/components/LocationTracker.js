@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import Loader from './Loader';
 import PreferencesModal from './PreferencesModal';
+import Chat from './Chat'; // Import the Chat component
 import { toast } from 'react-toastify';
 
 const LocationTracker = ({ preferences, onUpdate }) => {
@@ -17,9 +18,8 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
   const [showNearbyUsers, setShowNearbyUsers] = useState(false);
-// State for chatId
   const { data: session } = useSession();
-  useLocation(); // Use the location hook
+  useLocation();
 
   useEffect(() => {
     const eventSource = new EventSource('/api/stream');
@@ -28,7 +28,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
       const data = JSON.parse(event.data);
       if (data.userId === session?.user?.id) {
         setLocation(data);
-        setLoadingLocation(false); // Stop loading when location is set
+        setLoadingLocation(false);
       }
     };
 
@@ -38,9 +38,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   }, [session]);
 
   const handlePreferencesUpdate = (newPreferences) => {
-    onUpdate(newPreferences); // Call the onUpdate function passed from the parent
-    setPreferencesModalOpen(false); // Close the modal after updating
-    setPreferencesUpdated(true); // Set preferencesUpdated to true
+    onUpdate(newPreferences);
+    setPreferencesModalOpen(false);
+    setPreferencesUpdated(true);
   };
 
   const fetchNearbyUsers = async () => {
@@ -49,24 +49,23 @@ const LocationTracker = ({ preferences, onUpdate }) => {
       const data = await response.json();
       if (response.ok) {
         setNearbyUsers(data);
-        setShowNearbyUsers(true); // Show nearby users after fetching
-        console.log(data)
+        setShowNearbyUsers(true);
       } else {
         console.error(data.error);
       }
     }
   };
 
-  const toggleUserSelection = (userId) => {
+  const toggleUserSelection = (user) => {
     setSelectedUsers((prevSelected) => {
-      if (prevSelected.includes(userId)) {
-        return prevSelected.filter((id) => id !== userId);
+      const isSelected = prevSelected.some((u) => u.id === user.id);
+      if (isSelected) {
+        return prevSelected.filter((u) => u.id !== user.id);
       } else {
-        return [...prevSelected, userId];
+        return [...prevSelected, { id: user.id, name: user.name }];
       }
     });
   };
-
 
   return (
     <div className="flex flex-col items-center">
@@ -82,14 +81,14 @@ const LocationTracker = ({ preferences, onUpdate }) => {
           <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-600 text-4xl mb-4 animate-bounce" />
           <CuteMap latitude={location.latitude} longitude={location.longitude} />
           <motion.button 
-            onClick={() => setPreferencesModalOpen(true)} // Open the preferences modal
+            onClick={() => setPreferencesModalOpen(true)}
             className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300"
           >
             Add Your Preferences
           </motion.button>
-          {preferencesUpdated && ( // Conditionally render the Search Nearby button
+          {preferencesUpdated && (
             <button 
-              onClick={fetchNearbyUsers} // Fetch nearby users
+              onClick={fetchNearbyUsers}
               className="mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300"
             >
               Search Nearby
@@ -99,9 +98,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
             isOpen={preferencesModalOpen}
             onClose={() => setPreferencesModalOpen(false)}
             onUpdate={handlePreferencesUpdate}
-            userLocation={location} // Pass user location to PreferencesModal
+            userLocation={location}
           />
-          {showNearbyUsers && ( // Conditionally render nearby users
+          {showNearbyUsers && (
             <>
               <h3 className="mt-4 text-lg font-bold">Nearby Users:</h3>
               <ul className="mt-2">
@@ -109,8 +108,8 @@ const LocationTracker = ({ preferences, onUpdate }) => {
                   <li key={user.id} className="border-b py-2 flex items-center">
                     <input
                       type="checkbox"
-                      checked={selectedUsers.includes(user.id)}
-                      onChange={() => toggleUserSelection(user.id)}
+                      checked={selectedUsers.some((u) => u.id === user.id)}
+                      onChange={() => toggleUserSelection(user)}
                       className="mr-2"
                     />
                     {user.name} - {user.distance.toFixed(2)} km away
@@ -122,10 +121,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
                   </li>
                 ))}
               </ul>
-            
             </>
           )}
-         
+          {selectedUsers.length > 0 && <Chat selectedUsers={selectedUsers} />} {/* Render Chat component */}
         </motion.div>
       ) : (
         <p className="text-lg text-gray-600">No location data available.</p>
