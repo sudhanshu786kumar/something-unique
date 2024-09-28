@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { getUserByEmail, updateUser } from '@/app/models/User'; // Import updateUser
 import bcrypt from 'bcryptjs';
 import { initDatabase } from '@/app/lib/init-db';
-import { createGeospatialIndex } from '@/app/models/User';
+
 
 const authOptions = {
   providers: [
@@ -55,7 +55,6 @@ const authOptions = {
   },
   events: {
     async signIn(message) {
-      await createGeospatialIndex();
     },
   },
   pages: {

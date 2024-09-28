@@ -45,6 +45,9 @@ export default function Login() {
         transition={{ duration: 0.5 }}
         className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl"
       >
+        <div className="flex justify-center items-center">
+          <Link href="/" className="text-2xl font-bold text-orange-600">ShaFood</Link>
+        </div>
         <div>
           <motion.h2
             initial={{ scale: 0.9 }}
@@ -62,7 +65,7 @@ export default function Login() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center"
             role="alert"
           >
             <strong className="font-bold">Error: </strong>
@@ -130,6 +133,9 @@ export default function Login() {
             Don&apos;t have an account? Sign up
           </Link>
         </div>
+        <footer className="text-center mt-6 text-sm text-gray-600">
+          &copy; {new Date().getFullYear()} ShaFood. All rights reserved.
+        </footer>
       </motion.div>
     </div>
   );

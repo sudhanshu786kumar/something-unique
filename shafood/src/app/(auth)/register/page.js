@@ -49,11 +49,14 @@ export default function Register() {
         transition={{ duration: 0.5 }}
         className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl"
       >
+        <div className="flex justify-center items-center">
+          <Link href="/" className="text-2xl font-bold text-orange-600">ShaFood</Link>
+        </div>
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-orange-600">Join the ShaFood Community</h2>
         </div>
         {error && (
-          <div className="mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
+          <div className="mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded text-center" role="alert">
             <p className="font-bold">Error</p>
             <p>{error}</p>
           </div>
@@ -127,6 +130,9 @@ export default function Register() {
             Already have an account? Sign in
           </Link>
         </div>
+        <footer className="text-center mt-6 text-sm text-gray-600">
+          &copy; {new Date().getFullYear()} ShaFood. All rights reserved.
+        </footer>
       </motion.div>
     </div>
   );

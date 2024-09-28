@@ -173,7 +173,7 @@ const Chat = ({ selectedUsers }) => {
           </div>
         ) : (
           messages.map((msg, index) => (
-            <div key={index} className={`mb-2 flex items-center ${msg.sender === session.user.name ? 'justify-end' : 'justify-start'}`}>
+            <div key={index} className={`mb-1 flex items-center ${msg.sender === session.user.name ? 'justify-end ml-2' : 'justify-start mr-4'}`}>
               {msg.sender !== session.user.name && (
                 <div className="h-8 w-8 flex items-center justify-center bg-blue-500 text-white rounded-full mr-2">
                   {msg.sender.charAt(0)} {/* Display the first letter of the sender's name */}
