@@ -2,12 +2,6 @@ import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 export async function POST(request) {
   const formData = await request.formData();
   const file = formData.get('file');
@@ -32,3 +26,6 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Error uploading file' }, { status: 500 });
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge'; // Optional: Use the Edge runtime if needed
