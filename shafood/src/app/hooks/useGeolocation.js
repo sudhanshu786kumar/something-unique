@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 
 const useLocation = () => {
   const { data: session } = useSession();
+  const [location, setLocation] = useState(null);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -12,7 +13,6 @@ const useLocation = () => {
       const { latitude, longitude } = position.coords;
 
       try {
-        // Send location to the server
         const response = await fetch('/api/location', {
           method: 'POST',
           headers: {
@@ -25,17 +25,7 @@ const useLocation = () => {
           throw new Error('Failed to update location');
         }
 
-        // Optionally, trigger a Pusher event here if needed
-        const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-        });
-
-        pusher.trigger('location-updates', 'location-update', {
-          userId: session.user.id,
-          latitude,
-          longitude,
-        });
-
+        setLocation({ latitude, longitude });
       } catch (error) {
         console.error('Error updating location:', error);
       }
@@ -45,10 +35,25 @@ const useLocation = () => {
       console.error('Error watching position:', error);
     });
 
+    // Set up Pusher connection
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+    });
+
+    const channel = pusher.subscribe('location-updates');
+    channel.bind('location-update', (data) => {
+      if (data.userId === session.user.id) {
+        setLocation({ latitude: data.latitude, longitude: data.longitude });
+      }
+    });
+
     return () => {
       navigator.geolocation.clearWatch(watchId);
+      pusher.unsubscribe('location-updates');
     };
   }, [session]);
+
+  return location;
 };
 
 export default useLocation;

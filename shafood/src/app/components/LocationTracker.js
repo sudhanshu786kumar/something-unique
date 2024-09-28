@@ -4,21 +4,25 @@ import useLocation from '../hooks/useGeolocation';
 import CuteMap from './CuteMap';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
+import { faMapMarkerAlt, faUtensils, faShoppingBasket, faCartPlus } from '@fortawesome/free-solid-svg-icons';
 import Loader from './Loader';
 import PreferencesModal from './PreferencesModal';
 import Chat from './Chat'; // Import the Chat component
-import Pusher from 'pusher-js'; // Import Pusher
 
 const LocationTracker = ({ preferences, onUpdate }) => {
-  const [location, setLocation] = useState(null);
+  const location = useLocation();
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [nearbyUsers, setNearbyUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
   const { data: session } = useSession();
-  useLocation();
+
+  useEffect(() => {
+    if (location) {
+      setLoadingLocation(false);
+    }
+  }, [location]);
 
   useEffect(() => {
     // Always include the logged-in user in selectedUsers
@@ -32,26 +36,6 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     }
   }, [session]);
 
-  useEffect(() => {
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-    });
-
-    const channel = pusher.subscribe('location-updates');
-    channel.bind('location-update', (data) => {
-      console.log('Received location update:', data); // Log the incoming data
-      if (data.userId === session?.user?.id) {
-        setLocation(data);
-        setLoadingLocation(false);
-      }
-    });
-
-    return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-    };
-  }, [session]);
-
   const handlePreferencesUpdate = (newPreferences) => {
     onUpdate(newPreferences);
     setPreferencesModalOpen(false);
@@ -62,12 +46,15 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     if (location) {
       const foodProviders = preferences.foodProviders.join(',');
       const priceRange = preferences.priceRange;
-      const response = await fetch(`/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}&foodProviders=${foodProviders}&priceRange=${priceRange}`);
+      const url = `/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}&foodProviders=${foodProviders}&priceRange=${priceRange}`;
+      console.log('Fetching nearby users with URL:', url);
+      const response = await fetch(url);
       const data = await response.json();
       if (response.ok) {
+        console.log('Nearby users:', data);
         setNearbyUsers(data);
       } else {
-        console.error(data.error);
+        console.error('Error fetching nearby users:', data.error);
       }
     }
   };

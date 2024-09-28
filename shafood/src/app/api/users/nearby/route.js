@@ -18,29 +18,32 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const latitude = parseFloat(searchParams.get('latitude'));
   const longitude = parseFloat(searchParams.get('longitude'));
-  const radius = parseFloat(searchParams.get('radius')) || 7; // Default to 7 km
-  const foodProviders = searchParams.get('foodProviders') ? searchParams.get('foodProviders').split(',') : []; // Get food providers from query
-  const priceRange = searchParams.get('priceRange') ? searchParams.get('priceRange').split('-').map(Number) : [0, Infinity]; // Get price range from query
+  const radius = parseFloat(searchParams.get('radius')) || 7;
+  const foodProviders = searchParams.get('foodProviders')?.split(',') || [];
+  const priceRange = searchParams.get('priceRange');
 
   if (isNaN(latitude) || isNaN(longitude)) {
-    return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid latitude or longitude' }, { status: 400 });
   }
 
-  const users = await getAllUsers();
-  
-  const nearbyUsers = users
-    .filter(user => user.location && user.online) // Check if user is online and has a location
-    .map(user => ({
+  try {
+    const allUsers = await getAllUsers();
+    const nearbyUsers = allUsers.filter(user => {
+      if (!user.location) return false;
+      const distance = calculateDistance(latitude, longitude, user.location.latitude, user.location.longitude);
+      const matchesFoodProviders = foodProviders.length === 0 || (user.preferences?.foodProviders && user.preferences.foodProviders.some(provider => foodProviders.includes(provider)));
+      const matchesPriceRange = !priceRange || user.preferences?.priceRange === priceRange;
+      return distance <= radius && matchesFoodProviders && matchesPriceRange;
+    }).map(user => ({
       id: user._id,
       name: user.name,
       distance: calculateDistance(latitude, longitude, user.location.latitude, user.location.longitude),
-      preferredProviders: user.foodProviders || [], // Include preferred providers
-      price: user.price || 0 // Assuming user has a price property
-    }))
-    .filter(user => user.distance <= radius) // Filter by distance
-    .filter(user => foodProviders.length === 0 || user.preferredProviders.some(provider => foodProviders.includes(provider))) // Filter by food providers
-    .filter(user => user.price <= priceRange) // Filter by price range
-    .sort((a, b) => a.distance - b.distance);
+      preferredProviders: user.preferences?.foodProviders || []
+    }));
 
-  return NextResponse.json(nearbyUsers);
+    return NextResponse.json(nearbyUsers);
+  } catch (error) {
+    console.error('Error fetching nearby users:', error);
+    return NextResponse.json({ error: 'Failed to fetch nearby users' }, { status: 500 });
+  }
 }
