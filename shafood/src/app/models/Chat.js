@@ -1,4 +1,4 @@
- // Adjust the import based on your database setup
+// Adjust the import based on your database setup
 
 import clientPromise from "../lib/mongodb";
 
@@ -17,6 +17,7 @@ export const findExistingGroupChat = async (userIds) => {
 
     return chat; // Return the found chat or null if not found
 };
+
 
 // export const createGroupChat = async (userIds, creatorId) => {
 //     const client = await clientPromise;
@@ -45,34 +46,36 @@ export const getChatMessages = async (chatId) => {
     const chatCollection = db.collection('chats');
     const chatObjectId = typeof chatId === 'string' ? new ObjectId(chatId) : chatId;
     const chat = await chatCollection.findOne({ _id: chatObjectId });
-    console.log("hiiiiiiiiiiiiiii",chat);
     return chat ? chat.messages: [];
 };
 
-export const sendMessageToChat = async (chatId, text, sender, id) => {
+export const sendMessageToChat = async (chatId, text, sender, id, messageType = 'text', additionalData = null) => {
     const client = await clientPromise;
     const db = client.db();
     const chatCollection = db.collection('chats');
 
-    const message = { id, text, sender, createdAt: new Date() }; // Include the unique ID
+    const message = { 
+        id, 
+        text, 
+        sender, 
+        createdAt: new Date(),
+        messageType,
+        additionalData
+    };
 
-    // Convert chatId to ObjectId using 'new'
     const chatObjectId = typeof chatId === 'string' ? new ObjectId(chatId) : chatId;
 
     try {
-        // Check if the chat exists
         const chat = await chatCollection.findOne({ _id: chatObjectId });
         if (!chat) {
-            console.error('Chat not found for ID:', chatId);
-            throw new Error('Chat not found'); // Throw an error if chat does not exist
+            throw new Error('Chat not found');
         }
 
         const result = await chatCollection.updateOne(
             { _id: chatObjectId },
-            { $push: { messages: message } } // Push the new message to the messages array
+            { $push: { messages: message } }
         );
 
-        // Notify clients about the new message using Pusher
         const pusher = new Pusher({
             appId: process.env.NEXT_PUBLIC_PUSHER_APP_ID,
             key: process.env.NEXT_PUBLIC_PUSHER_KEY,
@@ -81,13 +84,12 @@ export const sendMessageToChat = async (chatId, text, sender, id) => {
             useTLS: true,
         });
 
-        // Trigger the event to notify other users
         await pusher.trigger(`chat-${chatObjectId}`, 'new-message', message);
 
-        return message; // Return the message with the unique ID
+        return message;
     } catch (error) {
         console.error('Error sending message:', error);
-        throw new Error('Failed to send message'); // Rethrow the error for the API route to catch
+        throw new Error('Failed to send message');
     }
 };
 
