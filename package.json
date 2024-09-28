@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "pusher": "^5.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.7.4"
-  }
-}
