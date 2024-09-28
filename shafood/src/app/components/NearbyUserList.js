@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
+
 const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   <div className="absolute inset-0 bg-white dark:bg-gray-800 z-10 p-4">
     <div className="flex justify-between items-center mb-4">
@@ -21,3 +24,5 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
     </ul>
   </div>
 );
+
+export default NearbyUsersList;
