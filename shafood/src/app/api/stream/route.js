@@ -10,7 +10,8 @@ export async function GET(request) {
 
       // Keep the connection alive
       const keepAlive = setInterval(() => {
-        controller.enqueue(`data: ${JSON.stringify({ message: 'Keep alive' })}\n\n`);
+        const message = JSON.stringify({ message: 'Keep alive' });
+        controller.enqueue(new TextEncoder().encode(`data: ${message}\n\n`)); // Convert string to Uint8Array
       }, 10000);
 
       // Cleanup on close
@@ -31,6 +32,6 @@ export async function GET(request) {
 
 export function sendLocationUpdate(location) {
   clients.forEach(client => {
-    client.enqueue(`data: ${JSON.stringify(location)}\n\n`);
+    client.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(location)}\n\n`)); // Convert string to Uint8Array
   });
 }
