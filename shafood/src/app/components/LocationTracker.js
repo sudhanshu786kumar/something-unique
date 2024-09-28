@@ -9,6 +9,7 @@ import Loader from './Loader';
 import PreferencesModal from './PreferencesModal';
 import Chat from './Chat'; // Import the Chat component
 import { toast } from 'react-toastify';
+import { faUtensils, faShoppingBasket, faCartPlus } from '@fortawesome/free-solid-svg-icons';
 
 const LocationTracker = ({ preferences, onUpdate }) => {
   const [location, setLocation] = useState(null);
@@ -57,7 +58,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
   const fetchNearbyUsers = async () => {
     if (location) {
-      const response = await fetch(`/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}`);
+      const foodProviders = preferences.foodProviders.join(','); // Join food providers into a string
+      const priceRange = preferences.priceRange; // Get the price range from preferences
+      const response = await fetch(`/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}&foodProviders=${foodProviders}&priceRange=${priceRange}`);
       const data = await response.json();
       if (response.ok) {
         setNearbyUsers(data);
@@ -81,6 +84,17 @@ const LocationTracker = ({ preferences, onUpdate }) => {
         return [...prevSelected, { id: user.id, name: user.name }];
       }
     });
+  };
+
+  // Function to get the provider icon based on the provider name
+  const getProviderIcon = (provider) => {
+    const providerIcons = {
+      Zomato: <FontAwesomeIcon icon={faUtensils} />, // Example icon for Zomato
+      Swiggy: <FontAwesomeIcon icon={faShoppingBasket} />, // Example icon for Swiggy
+      Zepto: <FontAwesomeIcon icon={faCartPlus} />, // Example icon for Zepto
+      // Add more providers as needed
+    };
+    return providerIcons[provider] || <FontAwesomeIcon icon={faUtensils} />; // Default icon if provider not found
   };
 
   return (
@@ -132,8 +146,12 @@ const LocationTracker = ({ preferences, onUpdate }) => {
                       />
                       {user.name} - {user.distance.toFixed(2)} km away
                       {user.preferredProviders.length > 0 && (
-                        <span className="ml-2 text-sm text-gray-600">
-                          (Preferred: {user.preferredProviders.join(', ')})
+                        <span className="ml-2 flex items-center">
+                          {user.preferredProviders.map(provider => (
+                            <span key={provider} className="h-4 w-4 mr-1">
+                              {getProviderIcon(provider)}
+                            </span>
+                          ))}
                         </span>
                       )}
                     </li>

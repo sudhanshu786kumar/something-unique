@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation }) => {
   const [foodProviders, setFoodProviders] = useState([]);
@@ -10,6 +10,16 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation }) => {
     onClose();
   };
 
+  const availableProviders = ['Zomato', 'Swiggy', 'Zepto']; // Example food providers
+
+  const handleProviderChange = (provider) => {
+    setFoodProviders((prev) => 
+      prev.includes(provider) 
+        ? prev.filter((p) => p !== provider) 
+        : [...prev, provider]
+    );
+  };
+
   return (
     isOpen && (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -17,13 +27,21 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation }) => {
           <h2 className="text-lg font-bold mb-4">Update Preferences</h2>
           <div>
             <label className="block mb-2">Food Providers:</label>
-            <input
-              type="text"
-              value={foodProviders}
-              onChange={(e) => setFoodProviders(e.target.value.split(','))}
-              placeholder="e.g. Zomato, Swiggy, Zepto"
-              className="border p-2 w-full mb-4"
-            />
+            <div className="mb-4">
+              {availableProviders.map(provider => (
+                <div key={provider} className="flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    id={provider}
+                    value={provider}
+                    checked={foodProviders.includes(provider)}
+                    onChange={() => handleProviderChange(provider)}
+                    className="mr-2"
+                  />
+                  <label htmlFor={provider} className="cursor-pointer">{provider}</label>
+                </div>
+              ))}
+            </div>
             <label className="block mb-2">Price Range:</label>
             <input
               type="text"

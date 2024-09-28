@@ -173,7 +173,7 @@ const Chat = ({ selectedUsers }) => {
           </div>
         ) : (
           messages.map((msg, index) => (
-            <div key={index} className={`mb-2 flex items-center ${msg.sender === session.user.name ? 'justify-end' : 'justify-start'}`}>
+            <div key={index} className={`mb-1 flex items-center ${msg.sender === session.user.name ? 'justify-end ml-2' : 'justify-start mr-4'}`}>
               {msg.sender !== session.user.name && (
                 <div className="h-8 w-8 flex items-center justify-center bg-blue-500 text-white rounded-full mr-2">
                   {msg.sender.charAt(0)} {/* Display the first letter of the sender's name */}
@@ -181,7 +181,13 @@ const Chat = ({ selectedUsers }) => {
               )}
               <div className={`flex flex-col ${msg.sender === session.user.name ? 'items-end' : 'items-start'}`}>
                 <strong className="text-blue-600">{msg.sender}</strong>
-                <span>{msg.text}</span>
+                <div className="relative">
+                  <span className={`block text-gray-800 whitespace-pre-wrap break-words max-w-[350px]`}> {/* Set max width for message block */}
+                    {msg.text.split(/(?<=\G.{50})/).map((line, i) => ( // Split text into lines of max 50 characters
+                      <span key={i} className="block">{line}</span>
+                    ))}
+                  </span>
+                </div>
                 <div className="flex space-x-2 mt-1">
                   <button onClick={() => addReaction(index, '👍')} className="text-sm">👍</button>
                 </div>
