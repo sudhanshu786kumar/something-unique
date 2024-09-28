@@ -8,17 +8,15 @@ import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import Loader from './Loader';
 import PreferencesModal from './PreferencesModal';
 import Chat from './Chat'; // Import the Chat component
-import { toast } from 'react-toastify';
-import { faUtensils, faShoppingBasket, faCartPlus } from '@fortawesome/free-solid-svg-icons';
+import Pusher from 'pusher-js'; // Import Pusher
 
 const LocationTracker = ({ preferences, onUpdate }) => {
   const [location, setLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [nearbyUsers, setNearbyUsers] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState([]); // Initialize selectedUsers
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
-  const [showNearbyUsers, setShowNearbyUsers] = useState(false);
   const { data: session } = useSession();
   useLocation();
 
@@ -35,18 +33,22 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   }, [session]);
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/stream');
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+    });
 
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    const channel = pusher.subscribe('location-updates');
+    channel.bind('location-update', (data) => {
+      console.log('Received location update:', data); // Log the incoming data
       if (data.userId === session?.user?.id) {
         setLocation(data);
         setLoadingLocation(false);
       }
-    };
+    });
 
     return () => {
-      eventSource.close();
+      channel.unbind_all();
+      channel.unsubscribe();
     };
   }, [session]);
 
@@ -58,13 +60,12 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
   const fetchNearbyUsers = async () => {
     if (location) {
-      const foodProviders = preferences.foodProviders.join(','); // Join food providers into a string
-      const priceRange = preferences.priceRange; // Get the price range from preferences
+      const foodProviders = preferences.foodProviders.join(',');
+      const priceRange = preferences.priceRange;
       const response = await fetch(`/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}&foodProviders=${foodProviders}&priceRange=${priceRange}`);
       const data = await response.json();
       if (response.ok) {
         setNearbyUsers(data);
-        setShowNearbyUsers(true);
       } else {
         console.error(data.error);
       }
@@ -75,7 +76,6 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     setSelectedUsers((prevSelected) => {
       const isSelected = prevSelected.some((u) => u.id === user.id);
       if (isSelected) {
-        // Prevent deselecting the logged-in user
         if (user.id === session.user.id) {
           return prevSelected; // Do not remove the logged-in user
         }
@@ -86,15 +86,13 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     });
   };
 
-  // Function to get the provider icon based on the provider name
   const getProviderIcon = (provider) => {
     const providerIcons = {
-      Zomato: <FontAwesomeIcon icon={faUtensils} />, // Example icon for Zomato
-      Swiggy: <FontAwesomeIcon icon={faShoppingBasket} />, // Example icon for Swiggy
-      Zepto: <FontAwesomeIcon icon={faCartPlus} />, // Example icon for Zepto
-      // Add more providers as needed
+      Zomato: <FontAwesomeIcon icon={faUtensils} />,
+      Swiggy: <FontAwesomeIcon icon={faShoppingBasket} />,
+      Zepto: <FontAwesomeIcon icon={faCartPlus} />,
     };
-    return providerIcons[provider] || <FontAwesomeIcon icon={faUtensils} />; // Default icon if provider not found
+    return providerIcons[provider] || <FontAwesomeIcon icon={faUtensils} />;
   };
 
   return (
@@ -130,12 +128,12 @@ const LocationTracker = ({ preferences, onUpdate }) => {
             onUpdate={handlePreferencesUpdate}
             userLocation={location}
           />
-          {showNearbyUsers && (
+          {nearbyUsers.length > 0 && (
             <>
               <h3 className="mt-4 text-lg font-bold">Nearby Users:</h3>
               <ul className="mt-2">
                 {nearbyUsers
-                  .filter(user => user.id !== session.user.id) // Filter out the logged-in user
+                  .filter(user => user.id !== session.user.id)
                   .map(user => (
                     <li key={user.id} className="border-b py-2 flex items-center">
                       <input
@@ -159,7 +157,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
               </ul>
             </>
           )}
-          {selectedUsers.length >= 2 && <Chat selectedUsers={selectedUsers} />} {/* Render Chat component */}
+          {selectedUsers.length >= 2 && <Chat selectedUsers={selectedUsers} />}
         </motion.div>
       ) : (
         <p className="text-lg text-gray-600">No location data available.</p>
