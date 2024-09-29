@@ -70,4 +70,25 @@ export const updateUserPreferences = async (userId, preferences) => {
 
 // Ensure you export the function
 
+export async function findOrCreateUser(userData) {
+  const client = await clientPromise;
+  const db = client.db();
+  const existingUser = await getUserByEmail(userData.email);
+
+  if (existingUser) {
+    return existingUser._id;
+  }
+
+  const userWithDefaults = {
+    ...userData,
+    isSharing: false,
+    isOrdering: false,
+    location: null,
+    online: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  const result = await db.collection('users').insertOne(userWithDefaults);
+  return result.insertedId;
+}
 

@@ -1,98 +1,190 @@
 'use client'
 
+import { useState, useEffect, lazy, Suspense } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
-import Loader from './Loader' // Import your existing loader component
-import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useInView } from 'react-intersection-observer'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faUtensils, faUsers, faMapMarkerAlt, faEnvelope } from '@fortawesome/free-solid-svg-icons'
+import { faInstagram, faTwitter, faFacebook } from '@fortawesome/free-brands-svg-icons'
+import dynamic from 'next/dynamic'
+import Loader from './Loader'
+import SEO from './SEO'
+
+const Lottie = dynamic(() => import('react-lottie-player'), { ssr: false })
+
+const StepCard = lazy(() => import('./StepCard'))
+const FeatureCard = lazy(() => import('./FeatureCard'))
+
+// Import animations
+import savingMoneyAnimation from '../animations/saving-money.json'
+import orderTogetherAnimation from '../animations/order-together.json'
+import chatAnimation from '../animations/chat.json'
 
 export default function Home() {
-    const [loading, setLoading] = useState(true);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const features = [
-        { icon: '🍽️', title: 'Share Meals', description: 'Connect with nearby users and share delicious meals together.' },
-        { icon: '💰', title: 'Split Bills', description: 'Easily split the bill among your group, hassle-free.' },
-        { icon: '🌟', title: 'Discover', description: 'Explore new cuisines and make friends over great food.' }
-    ];
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentStep, setCurrentStep] = useState(0)
+  const steps = [
+    { title: 'Register & Login', description: 'Create an account and log in to start saving.', icon: faUsers },
+    { title: 'Set Preferences', description: 'Choose your preferred providers, price range, and location.', icon: faUtensils },
+    { title: 'Order Together', description: 'Find nearby users and place orders as a group.', icon: faMapMarkerAlt },
+  ]
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % features.length);
-        }, 3000); // Change slide every 3 seconds
-        return () => clearTimeout(timer);
-    }, [currentIndex]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentStep((prevStep) => (prevStep + 1) % steps.length)
+    }, 5000)
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 2000); // Simulate loading
-        return () => clearTimeout(timer);
-    }, []);
+    const loadingTimer = setTimeout(() => {
+      setIsLoading(false)
+    }, 2000)
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader /> {/* Use your existing loader component */}
-            </div>
-        );
+    return () => {
+      clearInterval(timer)
+      clearTimeout(loadingTimer)
     }
+  }, [])
 
+  if (isLoading) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen py-2 bg-gradient-to-br from-orange-100 to-red-100">
-            <motion.div
-                initial={{ opacity: 0, y: -50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-center"
-            >
-                <h1 className="text-5xl font-bold mb-8 text-orange-600">ShaFood</h1>
-                <p className="text-xl mb-8 text-center max-w-2xl text-gray-700">
-                    Discover, Share, and Enjoy Meals Together!
-                </p>
-            </motion.div>
-            
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="mb-12 w-full max-w-4xl flex justify-center"
-            >
-                <motion.div
-                    key={currentIndex}
-                    initial={{ opacity: 0, x: 100 }} // Start from the right
-                    animate={{ opacity: 1, x: 0 }} // Slide in to the center
-                    exit={{ opacity: 0, x: -100 }} // Slide out to the left
-                    transition={{ duration: 0.5 }}
-                    className="mt-16 grid grid-cols-1 md:grid-cols-1 gap-8"
-                >
-                    <FeatureCard 
-                        icon={features[currentIndex].icon} 
-                        title={features[currentIndex].title} 
-                        description={features[currentIndex].description}
-                    />
-                </motion.div>
-            </motion.div>
-
-            <motion.div 
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="flex space-x-4"
-            >
-                <Link href="/login" className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 transform hover:scale-105">
-                    Login
-                </Link>
-                <Link href="/register" className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 transform hover:scale-105">
-                    Register
-                </Link>
-            </motion.div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 to-red-100">
+        <Loader size="h-16 w-16" />
+      </div>
     )
-}
+  }
 
-function FeatureCard({ icon, title, description }) {
-    return (
-        <div className="bg-white bg-opacity-30 backdrop-blur-lg p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col items-center">
-            <div className="text-4xl mb-4 text-center">{icon}</div> {/* Center the icon */}
-            <h3 className="text-xl font-semibold mb-2 text-orange-600 text-center">{title}</h3>
-            <p className="text-gray-600 text-center">{description}</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-red-100">
+      <SEO 
+        title="ShaFood - Save Money, Eat Together!" 
+        description="ShaFood helps you save on delivery charges by ordering together with nearby users."
+      />
+      <header className="py-6 px-6 md:px-12 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md shadow-md sticky top-0 z-50">
+        <motion.h1 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-3xl md:text-4xl font-bold text-orange-600"
+        >
+          ShaFood
+        </motion.h1>
+        <nav>
+          <motion.ul 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex space-x-6"
+          >
+            <li><Link href="#how-it-works" className="text-orange-600 hover:text-orange-700 font-semibold">How It Works</Link></li>
+            <li><Link href="#features" className="text-orange-600 hover:text-orange-700 font-semibold">Features</Link></li>
+          </motion.ul>
+        </nav>
+      </header>
+
+      <main className="container mx-auto px-4 py-16">
+        <motion.section
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-20"
+        >
+          <h2 className="text-5xl md:text-6xl font-bold mb-6 text-orange-600 leading-tight">
+            Save Money, Eat Together!
+          </h2>
+          <p className="text-xl mb-10 max-w-2xl mx-auto text-gray-700">
+            ShaFood helps you save on delivery charges by ordering together with nearby users. Join our community and start saving today!
+          </p>
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-6"
+          >
+            <Link href="/register" className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-10 rounded-full transition duration-300 transform hover:scale-105 text-center shadow-lg">
+              Get Started
+            </Link>
+            <Link href="/login" className="bg-white hover:bg-gray-100 text-orange-500 font-bold py-4 px-10 rounded-full transition duration-300 transform hover:scale-105 text-center shadow-lg border border-orange-500">
+              Login
+            </Link>
+          </motion.div>
+        </motion.section>
+        
+        <section id="how-it-works" className="mb-24">
+          <h2 className="text-4xl font-bold mb-12 text-orange-600 text-center">How It Works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <AnimatePresence mode="wait">
+              {steps.map((step, index) => (
+                <Suspense key={index} fallback={<Loader size="h-32 w-32" />}>
+                  <StepCard
+                    step={index + 1}
+                    title={step.title}
+                    description={step.description}
+                    icon={step.icon}
+                    delay={index * 0.1}
+                  />
+                </Suspense>
+              ))}
+            </AnimatePresence>
+          </div>
+        </section>
+
+        <section id="features" className="mb-24">
+          <h2 className="text-4xl font-bold mb-12 text-orange-600 text-center">App Features</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Suspense fallback={<Loader size="h-32 w-32" />}>
+              <FeatureCard
+                title="Save Money"
+                description="Reduce delivery charges by ordering together with nearby users."
+                animation={savingMoneyAnimation}
+                delay={0.1}
+              />
+            </Suspense>
+            <Suspense fallback={<Loader size="h-32 w-32" />}>
+              <FeatureCard
+                title="Order Together"
+                description="Find nearby users and place orders as a group."
+                animation={orderTogetherAnimation}
+                delay={0.2}
+              />
+            </Suspense>
+            <Suspense fallback={<Loader size="h-32 w-32" />}>
+              <FeatureCard
+                title="Chat & Share Location"
+                description="Easily communicate and share your location with group members."
+                animation={chatAnimation}
+                delay={0.3}
+              />
+            </Suspense>
+          </div>
+        </section>
+      </main>
+
+      <footer className="bg-orange-600 text-white py-10">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
+              <p className="text-lg">&copy; {new Date().getFullYear()} ShaFood. All rights reserved.</p>
+            </div>
+            <div className="flex space-x-6 mb-4 md:mb-0">
+              <a href="https://instagram.com/shafood" target="_blank" rel="noopener noreferrer" className="hover:text-orange-200 transition-colors duration-300">
+                <FontAwesomeIcon icon={faInstagram} size="lg" />
+              </a>
+              <a href="https://twitter.com/shafood" target="_blank" rel="noopener noreferrer" className="hover:text-orange-200 transition-colors duration-300">
+                <FontAwesomeIcon icon={faTwitter} size="lg" />
+              </a>
+              <a href="https://facebook.com/shafood" target="_blank" rel="noopener noreferrer" className="hover:text-orange-200 transition-colors duration-300">
+                <FontAwesomeIcon icon={faFacebook} size="lg" />
+              </a>
+            </div>
+            <div>
+              <Link href="/contact" className="flex items-center hover:text-orange-200 transition-colors duration-300">
+                <FontAwesomeIcon icon={faEnvelope} className="mr-2" />
+                Contact Us
+              </Link>
+            </div>
+          </div>
         </div>
-    )
+      </footer>
+    </div>
+  )
 }
