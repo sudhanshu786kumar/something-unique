@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUtensils, faUsers, faMapMarkerAlt, faEnvelope } from '@fortawesome/free-solid-svg-icons'
+import { faUtensils, faUsers, faMapMarkerAlt, faEnvelope, faBars, faTimes } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faTwitter, faFacebook } from '@fortawesome/free-brands-svg-icons'
 import dynamic from 'next/dynamic'
 import Loader from './Loader'
@@ -24,6 +24,7 @@ import chatAnimation from '../animations/chat.json'
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const steps = [
     { title: 'Register & Login', description: 'Create an account and log in to start saving.', icon: faUsers },
     { title: 'Set Preferences', description: 'Choose your preferred providers, price range, and location.', icon: faUtensils },
@@ -59,26 +60,50 @@ export default function Home() {
         title="ShaFood - Save Money, Eat Together!" 
         description="ShaFood helps you save on delivery charges by ordering together with nearby users."
       />
-      <header className="py-6 px-6 md:px-12 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md shadow-md sticky top-0 z-50">
-        <motion.h1 
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-3xl md:text-4xl font-bold text-orange-600"
-        >
-          ShaFood
-        </motion.h1>
-        <nav>
-          <motion.ul 
+      <header className="py-4 px-4 md:px-12 bg-white bg-opacity-90 backdrop-blur-md shadow-md sticky top-0 z-50">
+        <div className="container mx-auto flex justify-between items-center">
+          <motion.h1 
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-3xl md:text-4xl font-bold text-orange-600"
+          >
+            ShaFood
+          </motion.h1>
+          <nav className="hidden md:block">
+            <motion.ul 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="flex space-x-6"
+            >
+              <li><Link href="#how-it-works" className="text-orange-600 hover:text-orange-700 font-semibold">How It Works</Link></li>
+              <li><Link href="#features" className="text-orange-600 hover:text-orange-700 font-semibold">Features</Link></li>
+              <li><Link href="/contact" className="text-orange-600 hover:text-orange-700 font-semibold">Contact</Link></li>
+            </motion.ul>
+          </nav>
+          <button 
+            className="md:hidden text-orange-600 focus:outline-none"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            <FontAwesomeIcon icon={isMenuOpen ? faTimes : faBars} size="lg" />
+          </button>
+        </div>
+        {isMenuOpen && (
+          <motion.nav 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex space-x-6"
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="md:hidden mt-4"
           >
-            <li><Link href="#how-it-works" className="text-orange-600 hover:text-orange-700 font-semibold">How It Works</Link></li>
-            <li><Link href="#features" className="text-orange-600 hover:text-orange-700 font-semibold">Features</Link></li>
-          </motion.ul>
-        </nav>
+            <ul className="flex flex-col space-y-2">
+              <li><Link href="#how-it-works" className="block py-2 px-4 text-orange-600 hover:bg-orange-100 rounded" onClick={() => setIsMenuOpen(false)}>How It Works</Link></li>
+              <li><Link href="#features" className="block py-2 px-4 text-orange-600 hover:bg-orange-100 rounded" onClick={() => setIsMenuOpen(false)}>Features</Link></li>
+              <li><Link href="/contact" className="block py-2 px-4 text-orange-600 hover:bg-orange-100 rounded" onClick={() => setIsMenuOpen(false)}>Contact</Link></li>
+            </ul>
+          </motion.nav>
+        )}
       </header>
 
       <main className="container mx-auto px-4 py-16">
