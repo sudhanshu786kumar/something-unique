@@ -43,7 +43,7 @@ export default function Contact() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
               <h2 className="text-xl font-semibold mb-4">Get in Touch</h2>
-              <p className="text-gray-600 mb-4">We'd love to hear from you. Please fill out this form and we will get in touch with you shortly.</p>
+              <p className="text-gray-600 mb-4">We&apos;d love to hear from you. Please fill out this form and we will get in touch with you shortly.</p>
               <div className="space-y-2">
                 <p className="flex items-center text-gray-600">
                   <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-orange-500" />
@@ -113,7 +113,7 @@ export default function Contact() {
               role="alert"
             >
               <p className="font-bold">Thank you!</p>
-              <p>Your message has been sent successfully. We'll get back to you soon.</p>
+              <p>Your message has been sent successfully. We&apos;ll get back to you soon.</p>
             </motion.div>
           )}
 
