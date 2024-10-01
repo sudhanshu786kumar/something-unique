@@ -168,7 +168,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
                 <FontAwesomeIcon icon={faUserFriends} className="text-4xl text-orange-500 mb-2" />
                 <h3 className="text-xl font-bold text-orange-600 dark:text-orange-400 mb-2">No Nearby Users Found</h3>
                 <p className="text-gray-600 dark:text-gray-300">
-                  Don't worry! Adjust your preferences or try again later to find your perfect food buddies.
+                  Don&apos;t worry! Adjust your preferences or try again later to find your perfect food buddies.
                 </p>
               </motion.div>
             )}

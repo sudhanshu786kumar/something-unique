@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
@@ -152,13 +152,13 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
   };
 
   useEffect(() => {
-    if (selectedUsers.length > 1) {
-      const userIds = selectedUsers.map(user => user.id);
+    const userIds = selectedUsers.map(user => user.id);
+    if (userIds.length > 1) {
       findOrCreateChatSession(userIds);
     }
-  }, [selectedUsers]);
+  }, [selectedUsers, findOrCreateChatSession]);
 
-  const findOrCreateChatSession = async (userIds) => {
+  const findOrCreateChatSession = useCallback(async (userIds) => {
     if (userIds.length < 2) {
       toast.error("A chat requires at least two users.");
       return;
@@ -184,7 +184,7 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
       console.error("Error in findOrCreateChatSession:", error);
       toast.error("Failed to update chat session. Please try again.");
     }
-  };
+  }, []);
 
   const fetchMessages = async (chatId) => {
     setLoadingMessages(true);
