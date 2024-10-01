@@ -117,7 +117,7 @@ const Dashboard = () => {
             <Loader size="h-16 w-16" />
           </div>
         ) : (
-          <LocationTracker preferences={preferences} onUpdate={handlePreferencesUpdate} />
+          <LocationTracker preferences={preferences} onUpdate={handlePreferencesUpdate} session={session} />
         )}
       </main>
       <footer className="bg-white dark:bg-gray-800 shadow-inner mt-8">
