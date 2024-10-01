@@ -4,14 +4,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
 import { useSession } from 'next-auth/react';
 
-const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIcon, selectedUsers }) => {
+const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIcon, selectedUsers, onOpenChat }) => {
   const { data: session } = useSession();
   return (
     <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: isOpen ? 0 : '100%' }}
+      initial={{ y: '100%' }}
+      animate={{ y: isOpen ? 0 : '100%' }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-gray-800 shadow-lg z-50 overflow-y-auto"
+      className="fixed bottom-0 left-0 right-0 h-3/4 bg-white dark:bg-gray-800 shadow-lg z-50 overflow-y-auto rounded-t-3xl"
     >
       <div className="p-4">
         <div className="flex justify-between items-center mb-4">
@@ -20,7 +20,7 @@ const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIc
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
-        <ul className="space-y-4">
+        <ul className="space-y-4 mb-20">
           {users
           .filter(user => user.id !== session.user.id).map(user => (
             <li key={user.id} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-gray-700 rounded-lg shadow-sm">
@@ -51,6 +51,16 @@ const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIc
           ))}
         </ul>
       </div>
+      {selectedUsers.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={onOpenChat}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition duration-300 shadow-lg hover:shadow-xl"
+          >
+            Open Chat ({selectedUsers.length})
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 };

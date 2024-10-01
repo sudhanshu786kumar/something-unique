@@ -86,6 +86,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   const openChat = useCallback(() => {
     if (selectedUsers.length > 0) {
       setChatOpen(true);
+      setIsDrawerOpen(false);
     } else {
       console.log('No users selected for chat');
     }
@@ -180,16 +181,8 @@ const LocationTracker = ({ preferences, onUpdate }) => {
             onSelectUser={handleUserSelection}
             getProviderIcon={getProviderIcon}
             selectedUsers={selectedUsers}
+            onOpenChat={openChat}
           />
-
-          {selectedUsers.length > 0 && (
-            <button
-              onClick={openChat}
-              className="mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 shadow-lg hover:shadow-xl"
-            >
-              Open Chat ({selectedUsers.length})
-            </button>
-          )}
 
           {chatOpen && (
             <ChatModal
@@ -211,5 +204,6 @@ const LocationTracker = ({ preferences, onUpdate }) => {
     </div>
   );
 };
+
 
 export default LocationTracker;

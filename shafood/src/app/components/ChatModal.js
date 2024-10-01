@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faUtensils, faShoppingBasket, faCartPlus, faComments, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faUtensils, faShoppingBasket, faCartPlus, faComments, faSpinner, faBars } from '@fortawesome/free-solid-svg-icons';
 import { useSession } from 'next-auth/react';
 import Chat from './Chat';
 
@@ -12,6 +12,7 @@ const ChatModal = ({ isOpen, onClose, selectedUsers: initialSelectedUsers, nearb
   const [selectedUsers, setSelectedUsers] = useState(initialSelectedUsers);
   const [isLoading, setIsLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const providerUrls = {
     Zepto: '/api/proxy/Zepto',
@@ -84,15 +85,28 @@ const ChatModal = ({ isOpen, onClose, selectedUsers: initialSelectedUsers, nearb
         initial={{ scale: 0.9, y: 50 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 50 }}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl h-[90vh] md:h-[80vh] flex flex-col md:flex-row overflow-hidden"
       >
+        {/* Mobile menu button */}
+        <div className="md:hidden p-4 bg-orange-100 dark:bg-gray-700">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-orange-600 dark:text-orange-400"
+          >
+            <FontAwesomeIcon icon={faBars} size="lg" />
+          </button>
+        </div>
+
         {/* Left menu */}
-        <div className="w-1/4 bg-orange-100 dark:bg-gray-700 p-4 overflow-y-auto">
+        <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block w-full md:w-1/4 bg-orange-100 dark:bg-gray-700 p-4 overflow-y-auto`}>
           <h3 className="text-lg font-semibold mb-4 text-orange-600 dark:text-orange-400">Menu</h3>
           <ul className="space-y-2">
             <li className="flex items-center">
               <button
-                onClick={() => setSelectedProvider(null)}
+                onClick={() => {
+                  setSelectedProvider(null);
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`flex items-center w-full p-2 rounded-lg transition-colors ${
                   selectedProvider === null
                     ? 'bg-orange-200 dark:bg-orange-600'
@@ -106,7 +120,10 @@ const ChatModal = ({ isOpen, onClose, selectedUsers: initialSelectedUsers, nearb
             {combinedProviders.map(provider => (
               <li key={provider} className="flex items-center">
                 <button
-                  onClick={() => setSelectedProvider(provider)}
+                  onClick={() => {
+                    setSelectedProvider(provider);
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`flex items-center w-full p-2 rounded-lg transition-colors ${
                     selectedProvider === provider
                       ? 'bg-orange-200 dark:bg-orange-600'
