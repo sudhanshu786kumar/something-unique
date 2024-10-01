@@ -34,7 +34,6 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
 );
 
 const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSelectedUsers }) => {
-  console.log(selectedUsers);
   const { data: session } = useSession();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -44,18 +43,46 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Add these new states and functions
   const [showNearbyUsers, setShowNearbyUsers] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  // Predefined set of emojis
   const emojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '👀'];
 
-  // Add this check at the beginning of the component
-  if (!selectedUsers) {
-    return null; // or return a loading indicator
-  }
+  const findOrCreateChatSession = useCallback(async (userIds) => {
+    if (userIds.length < 2) {
+      toast.error("A chat requires at least two users.");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/chat/find-or-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds }),
+      });
+
+      if (response.ok) {
+        const { chatId } = await response.json();
+        setChatId(chatId);
+        fetchMessages(chatId);
+        initializePusher(chatId);
+        toast.success("Chat session updated successfully.");
+      } else {
+        throw new Error("Failed to create or update chat session");
+      }
+    } catch (error) {
+      console.error("Error in findOrCreateChatSession:", error);
+      toast.error("Failed to update chat session. Please try again.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedUsers && selectedUsers.length > 1) {
+      const userIds = selectedUsers.map(user => user.id);
+      findOrCreateChatSession(userIds);
+    }
+  }, [selectedUsers, findOrCreateChatSession]);
 
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
@@ -150,41 +177,6 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
     await findOrCreateChatSession(updatedUsers.map(user => user.id));
     onUpdateSelectedUsers(updatedUsers);
   };
-
-  useEffect(() => {
-    const userIds = selectedUsers.map(user => user.id);
-    if (userIds.length > 1) {
-      findOrCreateChatSession(userIds);
-    }
-  }, [selectedUsers, findOrCreateChatSession]);
-
-  const findOrCreateChatSession = useCallback(async (userIds) => {
-    if (userIds.length < 2) {
-      toast.error("A chat requires at least two users.");
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/chat/find-or-create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds }),
-      });
-
-      if (response.ok) {
-        const { chatId } = await response.json();
-        setChatId(chatId);
-        fetchMessages(chatId);
-        initializePusher(chatId);
-        toast.success("Chat session updated successfully.");
-      } else {
-        throw new Error("Failed to create or update chat session");
-      }
-    } catch (error) {
-      console.error("Error in findOrCreateChatSession:", error);
-      toast.error("Failed to update chat session. Please try again.");
-    }
-  }, []);
 
   const fetchMessages = async (chatId) => {
     setLoadingMessages(true);
@@ -357,6 +349,10 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
       ))}
     </div>
   );
+
+  if (!selectedUsers) {
+    return null; // or return a loading indicator
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
