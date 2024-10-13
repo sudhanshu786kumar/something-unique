@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
 const FinalConfirmation = ({ chatId }) => {
@@ -6,16 +6,16 @@ const FinalConfirmation = ({ chatId }) => {
     const [confirmations, setConfirmations] = useState({});
     const [isCompleted, setIsCompleted] = useState(false);
 
-    useEffect(() => {
-        fetchConfirmations();
-    }, []);
-
-    const fetchConfirmations = async () => {
+    const fetchConfirmations = useCallback(async () => {
         const response = await fetch(`/api/order/confirmations?chatId=${chatId}`);
         const data = await response.json();
         setConfirmations(data.confirmations);
         setIsCompleted(data.isCompleted);
-    };
+    }, [chatId]);
+
+    useEffect(() => {
+        fetchConfirmations();
+    }, [fetchConfirmations]);
 
     const confirmDelivery = async () => {
         const response = await fetch('/api/order/confirm', {
@@ -35,7 +35,7 @@ const FinalConfirmation = ({ chatId }) => {
                 <p className="text-green-500 font-bold">Order completed and funds distributed!</p>
             ) : (
                 <>
-                    <p className="mb-4">Confirm when you've received your part of the order:</p>
+                    <p className="mb-4">Confirm when you&apos;ve received your part of the order:</p>
                     <div className="space-y-2">
                         {Object.entries(confirmations).map(([userId, confirmed]) => (
                             <p key={userId}>{userId}: {confirmed ? 'Confirmed' : 'Pending'}</p>
