@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck } from '@fortawesome/free-solid-svg-icons';
@@ -13,6 +13,17 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     const [selectedOrderer, setSelectedOrderer] = useState(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [receivedCount, setReceivedCount] = useState(0);
+
+    // Use useMemo to create a unique list of users
+    const uniqueUsers = useMemo(() => {
+        const uniqueUserMap = new Map();
+        users.forEach(user => {
+            if (!uniqueUserMap.has(user.id)) {
+                uniqueUserMap.set(user.id, user);
+            }
+        });
+        return Array.from(uniqueUserMap.values());
+    }, [users]);
 
     useEffect(() => {
         fetchOrderStatus();
@@ -92,6 +103,10 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     };
 
     const toggleOrderer = async (userId) => {
+        if (orderStatus !== 'pending') {
+            toast.error("Orderer can only be changed when the order status is pending.");
+            return;
+        }
         try {
             const response = await fetch('/api/order/updateOrderer', {
                 method: 'POST',
@@ -100,11 +115,12 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                console.log("Toggle orderer response:", data); // Add this line
+                console.log("Toggle orderer response:", data);
                 // The server will trigger the Pusher event, so we don't need to update the state here
             }
         } catch (error) {
             console.error('Error updating orderer:', error);
+            toast.error('Failed to update orderer. Please try again.');
         }
     };
 
@@ -188,15 +204,16 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                 {/* User list and Action buttons */}
                 <div className="md:w-1/2">
                     <div className="grid grid-cols-1 gap-4 mb-6">
-                {users.map(user => (
+                {uniqueUsers.map(user => (
                     <motion.div
                         key={user.id}
-                        className={`p-4 rounded-lg ${
+                        className={`p-4 rounded-lg cursor-pointer ${
                             user.id === selectedOrderer 
                                 ? 'bg-orange-200 dark:bg-orange-700 border-4 border-orange-500 shadow-lg'
-                                : 'bg-gray-100 dark:bg-gray-700'
+                                : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                         whileHover={{ scale: 1.02 }}
+                        onClick={() => toggleOrderer(user.id)}
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center">
@@ -224,23 +241,6 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                                         className={`text-2xl ${userStatuses[user.id] === 'received' ? 'text-green-500' : 'text-orange-500'}`}
                                     />
                                 </motion.div>
-                                {orderStatus === 'pending' && (
-                                    <Tooltip content={user.id === selectedOrderer ? "Remove yourself as orderer" : "Set yourself as orderer"}>
-                                        <motion.button
-                                            onClick={() => toggleOrderer(user.id)}
-                                            className={`p-2 rounded-full ${
-                                                user.id === selectedOrderer
-                                                    ? 'bg-red-500 hover:bg-red-600'
-                                                    : 'bg-green-500 hover:bg-green-600'
-                                            } text-white`}
-                                            whileHover={{ scale: 1.1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            disabled={user.id !== currentUserId}
-                                        >
-                                            <FontAwesomeIcon icon={user.id === selectedOrderer ? faTimes : faUtensils} />
-                                        </motion.button>
-                                    </Tooltip>
-                                )}
                             </div>
                         </div>
                     </motion.div>

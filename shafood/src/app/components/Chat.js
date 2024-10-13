@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/customScrollbar.css';
@@ -49,14 +49,50 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
   const [showNearbyUsers, setShowNearbyUsers] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-
-  // const [isOrderProcessOpen, setIsOrderProcessOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const emojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '👀'];
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeView, setActiveView] = useState('chat'); // 'chat', 'nearbyUsers', 'emojiPicker'
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const [showBackButton, setShowBackButton] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768); // Adjust breakpoint as needed
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const findOrCreateChatSession = useCallback(async (userIds) => {
-    if (userIds.length < 2) {
-      toast.error("A chat requires at least two users.");
+    if (!session || !session.user) {
+      toast.error("You must be logged in to start a chat.");
+      return;
+    }
+
+    // Ensure the current user is always included
+    const allUserIds = Array.from(new Set([...userIds, session.user.id]));
+
+    if (allUserIds.length < 2) {
+      toast.error("Please select at least one other user to start a chat.");
       return;
     }
 
@@ -64,7 +100,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
       const response = await fetch('/api/chat/find-or-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: [...userIds, session.user.id] }),
+        body: JSON.stringify({ userIds: allUserIds }),
       });
 
       if (response.ok) {
@@ -73,7 +109,6 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
         onChatIdChange(chatId);
         fetchMessages(chatId);
         initializePusher(chatId);
-        //toast.success("Chat session updated successfully.");
       } else {
         throw new Error("Failed to create or update chat session");
       }
@@ -81,30 +116,36 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
       console.error("Error in findOrCreateChatSession:", error);
       toast.error("Failed to update chat session. Please try again.");
     }
-  }, [onChatIdChange]);
+  }, [onChatIdChange, session]);
 
   useEffect(() => {
-    if (selectedUsers && selectedUsers.length > 1) {
+    if (session && session.user) {
+      const loggedInUser = {
+        id: session.user.id,
+        name: session.user.name
+      };
+      
+      // Check if the logged-in user is already in the selectedUsers
+      const isLoggedInUserIncluded = selectedUsers.some(user => user.id === loggedInUser.id);
+      
+      if (!isLoggedInUserIncluded) {
+        // Add the logged-in user to the selectedUsers
+        const updatedUsers = [...selectedUsers, loggedInUser];
+        onUpdateSelectedUsers(updatedUsers);
+      }
+    }
+  }, [session, selectedUsers, onUpdateSelectedUsers]);
+
+  useEffect(() => {
+    if (selectedUsers && selectedUsers.length > 0) {
       const userIds = selectedUsers.map(user => user.id);
       findOrCreateChatSession(userIds);
-        
     }
   }, [selectedUsers, findOrCreateChatSession]);
 
-  // useEffect(() => {
-  //   // Assuming you have a function to generate or fetch chatId
-  //   const fetchChatId = async () => {
-  //     const id = await generateChatId(); // Implement this function
-  //     setChatId(id);
-  //     onChatIdChange(id);
-  //   };
-
-  //   fetchChatId();
-  // }, [onChatIdChange]);
-
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
-    setShowEmojiPicker(false);
+    setShowMenu(false);
   };
 
   const sendLocation = () => {
@@ -196,14 +237,34 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
     onUpdateSelectedUsers(updatedUsers);
   };
 
-  const fetchMessages = async (chatId) => {
+  const fetchMessages = useCallback(async (chatId, page = 1) => {
     setLoadingMessages(true);
-    const response = await fetch(`/api/chat/${chatId}/messages`);
-    if (response.ok) {
-      const data = await response.json();
-      setMessages(data.messages);
+    try {
+      const response = await fetch(`/api/chat/${chatId}/messages?page=${page}&limit=20`);
+      if (response.ok) {
+        const data = await response.json();
+        if (page === 1) {
+          setMessages(data.messages);
+        } else {
+          setMessages(prevMessages => [...prevMessages, ...data.messages]);
+        }
+        setHasMore(data.hasMore);
+      } else {
+        throw new Error('Failed to fetch messages');
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      toast.error('Failed to load messages. Please try again.');
+    } finally {
+      setLoadingMessages(false);
     }
-    setLoadingMessages(false);
+  }, []);
+
+  const loadMoreMessages = () => {
+    if (hasMore && !loadingMessages) {
+      setPage(prevPage => prevPage + 1);
+      fetchMessages(chatId, page + 1);
+    }
   };
 
   const initializePusher = (chatId) => {
@@ -374,6 +435,21 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
     // Any other reset actions you need
   };
 
+  const handleScroll = useCallback((e) => {
+    const { scrollTop } = e.target;
+    if (scrollTop === 0 && hasMore && !loadingMessages) {
+      loadMoreMessages();
+    }
+  }, [hasMore, loadingMessages, loadMoreMessages]);
+
+  const handleBack = () => {
+    if (showMenu) {
+      setShowMenu(false);
+    } else if (showBackButton) {
+      onClose(); // This should navigate back to the main chat interface
+    }
+  };
+
   if (!selectedUsers) {
     return null; // or return a loading indicator
   }
@@ -392,35 +468,38 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-800 overflow-hidden">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 overflow-hidden relative">
       <div className="bg-blue-500 text-white p-3">
         <div className="flex justify-between items-center mb-2">
+          {(isMobile || showBackButton) && (
+            <button
+              onClick={handleBack}
+              className="text-white hover:text-gray-200 focus:outline-none"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+          )}
           <h2 className="text-lg font-semibold">
             {selectedUsers.length > 2 ? 'Group Chat' : 'Chat'}
           </h2>
-          <button onClick={onClose} className="text-white hover:text-gray-200">
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
+          {!isMobile && (
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-200 focus:outline-none"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          )}
         </div>
         <SelectedUsersList users={selectedUsers} onRemove={removeUserFromChat} />
-        <button
-          onClick={() => setShowNearbyUsers(true)}
-          className="mt-2 bg-blue-600 text-white px-2 py-1 text-sm rounded-full hover:bg-blue-700 transition duration-300"
-        >
-          <FontAwesomeIcon icon={faUserPlus} className="mr-1" />
-          Add User
-        </button>
       </div>
 
-      {showNearbyUsers && (
-        <NearbyUsersList
-          nearbyUsers={ nearbyUsers}
-          onAddUser={addUserToChat}
-          onClose={() => setShowNearbyUsers(false)}
-        />
-      )}
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 mb-16" onScroll={handleScroll}>
+        {hasMore && (
+          <button onClick={loadMoreMessages} className="w-full text-center text-blue-500 hover:text-blue-600">
+            Load More Messages
+          </button>
+        )}
         {loadingMessages ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, index) => (
@@ -475,7 +554,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+      <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3">
         <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex items-center space-x-2">
           <input
             ref={inputRef}
@@ -505,25 +584,11 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
       </div>
 
       {showMenu && (
-        <div className="absolute bottom-14 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-            <FontAwesomeIcon icon={faSmile} className="mr-2" /> Emoji
+        <div ref={menuRef} className="absolute bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 z-10">
+          <button onClick={() => setShowMenu(false)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+            <FontAwesomeIcon icon={faTimes} />
           </button>
-          <button onClick={sendLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-            <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" /> Send Location
-          </button>
-          <button onClick={calculateNearestLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-            <FontAwesomeIcon icon={faMapPin} className="mr-2" /> Nearest Location
-          </button>
-          <button onClick={sendDocument} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-            <FontAwesomeIcon icon={faFile} className="mr-2" /> Send Document
-          </button>
-        </div>
-      )}
-
-      {showEmojiPicker && (
-        <div className="absolute bottom-14 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-5 gap-1 mb-2">
             {emojis.map((emoji, index) => (
               <button
                 key={index}
@@ -534,6 +599,15 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
               </button>
             ))}
           </div>
+          <button onClick={sendLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+            <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" /> Send Location
+          </button>
+          <button onClick={calculateNearestLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+            <FontAwesomeIcon icon={faMapPin} className="mr-2" /> Nearest Location
+          </button>
+          <button onClick={sendDocument} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+            <FontAwesomeIcon icon={faFile} className="mr-2" /> Send Document
+          </button>
         </div>
       )}
     </div>

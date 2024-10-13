@@ -17,6 +17,7 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
   const [activeTab, setActiveTab] = useState('chat');
   const [chatId, setChatId] = useState('');
   const { theme, setTheme } = useTheme();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -35,11 +36,49 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
       Zomato: faUtensils,
       Swiggy: faShoppingBasket,
       Zepto: faCartPlus,
+      UberEats: faCartPlus,
     };
     return providerIcons[provider] || faUtensils;
   };
 
   const combinedProviders = [...new Set(selectedUsers.flatMap(user => user.preferredProviders))];
+
+  const renderMobileMenu = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 w-4/5 max-w-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Menu</h3>
+          <button
+            onClick={() => setShowMobileMenu(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <FontAwesomeIcon icon={faTimes} size="lg" />
+          </button>
+        </div>
+        <div className="space-y-2">
+          <button
+            onClick={() => {
+              setActiveTab('chat');
+              setShowMobileMenu(false);
+            }}
+            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          >
+            Chats
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('groups');
+              setShowMobileMenu(false);
+            }}
+            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          >
+            Groups
+          </button>
+          {/* Add more menu items as needed */}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900">
@@ -132,7 +171,7 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
           {activeTab === 'order' && (
             <OrderProcess
               chatId={chatId}
-              users={[...selectedUsers, session?.user]}
+              users={selectedUsers}
               currentUserId={session?.user?.id}
             />
           )}
