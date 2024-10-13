@@ -4,10 +4,12 @@ import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/customScrollbar.css';
+import OrderProcess from './OrderProcess';
+
 
 const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   <div className="absolute inset-0 bg-white dark:bg-gray-800 z-10 p-4">
@@ -21,8 +23,8 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
       {nearbyUsers.map(user => (
         <li key={user.id} className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
           <span>{user.name}</span>
-          <button 
-            onClick={() => onAddUser(user.id)} 
+          <button
+            onClick={() => onAddUser(user.id)}
             className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
           >
             Add
@@ -33,8 +35,9 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   </div>
 );
 
-const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSelectedUsers }) => {
+const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose }) => {
   const { data: session } = useSession();
+ 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatId, setChatId] = useState('');
@@ -46,6 +49,8 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
   const [showNearbyUsers, setShowNearbyUsers] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+
+  const [isOrderProcessOpen, setIsOrderProcessOpen] = useState(false);
 
   const emojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '👀'];
 
@@ -59,15 +64,16 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
       const response = await fetch('/api/chat/find-or-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds }),
+        body: JSON.stringify({ userIds: [...userIds, session.user.id] }),
       });
 
       if (response.ok) {
         const { chatId } = await response.json();
         setChatId(chatId);
+        onChatIdChange(chatId);
         fetchMessages(chatId);
         initializePusher(chatId);
-        toast.success("Chat session updated successfully.");
+        //toast.success("Chat session updated successfully.");
       } else {
         throw new Error("Failed to create or update chat session");
       }
@@ -75,14 +81,26 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
       console.error("Error in findOrCreateChatSession:", error);
       toast.error("Failed to update chat session. Please try again.");
     }
-  }, []);
+  }, [session.user.id, onChatIdChange]);
 
   useEffect(() => {
     if (selectedUsers && selectedUsers.length > 1) {
       const userIds = selectedUsers.map(user => user.id);
       findOrCreateChatSession(userIds);
+        
     }
   }, [selectedUsers, findOrCreateChatSession]);
+
+  // useEffect(() => {
+  //   // Assuming you have a function to generate or fetch chatId
+  //   const fetchChatId = async () => {
+  //     const id = await generateChatId(); // Implement this function
+  //     setChatId(id);
+  //     onChatIdChange(id);
+  //   };
+
+  //   fetchChatId();
+  // }, [onChatIdChange]);
 
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
@@ -169,7 +187,7 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
   };
 
   const removeUserFromChat = async (userId) => {
-    if (userId === loggedInUserId) {
+    if (userId === session.user.id) {
       toast.error("You cannot remove yourself from the chat.");
       return;
     }
@@ -337,7 +355,7 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
       {users.map(user => (
         <div key={user.id} className="bg-blue-600 rounded-full px-3 py-1 text-sm mr-2 mb-2 flex items-center">
           <span>{user.name}</span>
-          {user.id !== loggedInUserId && (
+          {user.id !== session.user.id && (
             <button
               onClick={() => onRemove(user.id)}
               className="ml-2 text-white hover:text-gray-200 focus:outline-none"
@@ -350,15 +368,21 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
     </div>
   );
 
+  const resetChat = () => {
+    setMessages([]);
+    setNewMessage('');
+    // Any other reset actions you need
+  };
+
   if (!selectedUsers) {
     return null; // or return a loading indicator
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-      <div className="bg-blue-500 text-white p-4">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 overflow-hidden">
+      <div className="bg-blue-500 text-white p-3">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-lg font-semibold">
             {selectedUsers.length > 2 ? 'Group Chat' : 'Chat'}
           </h2>
           <button onClick={onClose} className="text-white hover:text-gray-200">
@@ -368,39 +392,39 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
         <SelectedUsersList users={selectedUsers} onRemove={removeUserFromChat} />
         <button
           onClick={() => setShowNearbyUsers(true)}
-          className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700 transition duration-300"
+          className="mt-2 bg-blue-600 text-white px-2 py-1 text-sm rounded-full hover:bg-blue-700 transition duration-300"
         >
-          <FontAwesomeIcon icon={faUserPlus} className="mr-2" />
+          <FontAwesomeIcon icon={faUserPlus} className="mr-1" />
           Add User
         </button>
       </div>
-      
+
       {showNearbyUsers && (
-        <NearbyUsersList 
-          nearbyUsers={nearbyUsers.filter(user => !selectedUsers.some(u => u.id === user.id))}
+        <NearbyUsersList
+          nearbyUsers={ nearbyUsers}
           onAddUser={addUserToChat}
           onClose={() => setShowNearbyUsers(false)}
         />
       )}
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {loadingMessages ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, index) => (
-              <div key={index} className="animate-pulse flex space-x-4">
+              <div key={index} className="animate-pulse flex space-x-3">
                 <div className="flex-shrink-0">
-                  <div className="h-10 w-10 bg-gray-300 rounded-full"></div>
+                  <div className="h-8 w-8 bg-gray-300 rounded-full"></div>
                 </div>
-                <div className="flex-1 space-y-2 py-1">
-                  <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                  <div className="h-4 bg-gray-300 rounded"></div>
+                <div className="flex-1 space-y-1 py-1">
+                  <div className="h-3 bg-gray-300 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-300 rounded"></div>
                 </div>
               </div>
             ))}
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-gray-500 dark:text-gray-400">
-            <p className="text-lg">Start a new chat!</p>
+            <p className="text-base">Start a new chat!</p>
             <p className="text-sm">Send a message to begin the conversation.</p>
           </div>
         ) : (
@@ -412,18 +436,18 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
               transition={{ duration: 0.3 }}
               className={`flex ${msg.sender === session.user.name ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[70%] ${msg.sender === session.user.name ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'} rounded-lg p-3 shadow`}>
-                <p className="font-semibold text-sm mb-1">{msg.sender}</p>
+              <div className={`max-w-[70%] ${msg.sender === session.user.name ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'} rounded-lg p-2 shadow`}>
+                <p className="font-semibold text-xs mb-1">{msg.sender}</p>
                 {renderMessage(msg)}
-                <div className="flex justify-between items-center mt-2">
+                <div className="flex justify-between items-center mt-1">
                   <div className="text-xs opacity-75">
                     {new Date(msg.createdAt).toLocaleTimeString()}
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-1">
                     {msg.reactions && msg.reactions.map((reaction, i) => (
-                      <span key={i} className="text-sm">{reaction}</span>
+                      <span key={i} className="text-xs">{reaction}</span>
                     ))}
-                    <button onClick={() => addReaction(index, '👍')} className="text-sm opacity-75 hover:opacity-100">👍</button>
+                    <button onClick={() => addReaction(index, '👍')} className="text-xs opacity-75 hover:opacity-100">👍</button>
                   </div>
                 </div>
               </div>
@@ -431,14 +455,14 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
           ))
         )}
         {typingUsers.size > 0 && (
-          <div className="text-gray-500 dark:text-gray-400 italic text-sm">
+          <div className="text-gray-500 dark:text-gray-400 italic text-xs">
             {Array.from(typingUsers).join(', ')} {typingUsers.size > 1 ? 'are' : 'is'} typing...
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-      
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
         <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex items-center space-x-2">
           <input
             ref={inputRef}
@@ -449,7 +473,7 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
               handleTyping();
             }}
             placeholder="Type your message..."
-            className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="button"
@@ -464,40 +488,56 @@ const Chat = ({ selectedUsers, onClose, nearbyUsers, loggedInUserId, onUpdateSel
           >
             <FontAwesomeIcon icon={faPaperPlane} />
           </button>
+          <button
+            type="button"
+            onClick={() => setIsOrderProcessOpen(true)}
+            className="bg-green-500 text-white rounded-full p-2 hover:bg-green-600 transition focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <FontAwesomeIcon icon={faUtensils} />
+          </button>
         </form>
       </div>
-      
+
       {showMenu && (
-        <div className="absolute bottom-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="block w-full text-left px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700">
+        <div className="absolute bottom-14 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
             <FontAwesomeIcon icon={faSmile} className="mr-2" /> Emoji
           </button>
-          <button onClick={sendLocation} className="block w-full text-left px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button onClick={sendLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
             <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" /> Send Location
           </button>
-          <button onClick={calculateNearestLocation} className="block w-full text-left px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button onClick={calculateNearestLocation} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
             <FontAwesomeIcon icon={faMapPin} className="mr-2" /> Nearest Location
           </button>
-          <button onClick={sendDocument} className="block w-full text-left px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button onClick={sendDocument} className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
             <FontAwesomeIcon icon={faFile} className="mr-2" /> Send Document
           </button>
         </div>
       )}
-      
+
       {showEmojiPicker && (
-        <div className="absolute bottom-16 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
-          <div className="grid grid-cols-5 gap-2">
+        <div className="absolute bottom-14 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2">
+          <div className="grid grid-cols-5 gap-1">
             {emojis.map((emoji, index) => (
               <button
                 key={index}
                 onClick={() => addEmoji(emoji)}
-                className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded"
+                className="text-xl hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded"
               >
                 {emoji}
               </button>
             ))}
           </div>
         </div>
+      )}
+
+      {isOrderProcessOpen && (
+        <OrderProcess
+          chatId={chatId}
+          users={selectedUsers}
+          currentUserId={session.user.id}
+          onClose={() => setIsOrderProcessOpen(false)}
+        />
       )}
     </div>
   );

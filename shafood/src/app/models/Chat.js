@@ -18,28 +18,6 @@ export const findExistingGroupChat = async (userIds) => {
     return chat; // Return the found chat or null if not found
 };
 
-
-// export const createGroupChat = async (userIds, creatorId) => {
-//     const client = await clientPromise;
-//     const db = client.db();
-//     const chatCollection = db.collection('chats');
-
-//     const newChat = {
-//         users: [...userIds, creatorId], // Include the creator in the chat
-//         messages: [], // Initialize with an empty messages array
-//         createdAt: new Date(),
-//     };
-
-//     const result = await chatCollection.insertOne(newChat);
-    
-//     // Notify all users in the chat about the new chat
-//     userIds.forEach(userId => {
-//         notifyNewChat(userId); // Notify each user about the new chat
-//     });
-    
-//     return { id: result.insertedId, ...newChat }; // Return the new chat object
-// };
-
 export const getChatMessages = async (chatId) => {
     const client = await clientPromise;
     const db = client.db();
@@ -103,7 +81,7 @@ export const getMessagesForChat = async (chatId) => {
 };
 
 // New function to find or create a chat session
-export const findOrCreateChatSession = async (userIds) => {
+export const findOrCreateChatSession = async (userIds, creatorId) => {
     const client = await clientPromise;
     const db = client.db();
     const chatCollection = db.collection('chats');
@@ -121,6 +99,12 @@ export const findOrCreateChatSession = async (userIds) => {
             users: userIds,
             messages: [],
             createdAt: new Date(),
+            orderStatus: 'pending',
+            orderer: null,
+            provider: null,
+            totalAmount: 0,
+            deposits: {},
+            creatorId: creatorId
         };
         const result = await chatCollection.insertOne(newChat);
         return result.insertedId; // Return new chat ID

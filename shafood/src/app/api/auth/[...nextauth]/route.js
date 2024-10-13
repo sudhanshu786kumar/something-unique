@@ -6,7 +6,7 @@ import { getUserByEmail, createUser, updateUser } from '@/app/models/User';
 import bcrypt from 'bcryptjs';
 import { initDatabase } from '@/app/lib/init-db';
 
-const authOptions = {
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',

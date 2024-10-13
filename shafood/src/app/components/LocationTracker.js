@@ -8,8 +8,9 @@ import { faMapMarkerAlt, faUtensils, faShoppingBasket, faCartPlus, faUserFriends
 import Loader from './Loader';
 import PreferencesModal from './PreferencesModal';
 import NearbyUsersDrawer from './NearbyUsersDrawer';
-import ChatModal from './ChatModal';
 import SearchAnimation from './SearchAnimation';
+import { useRouter } from 'next/navigation';
+
 
 const LocationTracker = ({ preferences, onUpdate }) => {
   const location = useLocation();
@@ -23,6 +24,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [searchComplete, setSearchComplete] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (location) {
@@ -85,12 +87,11 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
   const openChat = useCallback(() => {
     if (selectedUsers.length > 0) {
-      setChatOpen(true);
-      setIsDrawerOpen(false);
+      router.push(`/chat?users=${encodeURIComponent(JSON.stringify(selectedUsers))}`);
     } else {
       console.log('No users selected for chat');
     }
-  }, [selectedUsers]);
+  }, [selectedUsers, router]);
 
   const getProviderIcon = (provider) => {
     const providerIcons = {
@@ -183,25 +184,12 @@ const LocationTracker = ({ preferences, onUpdate }) => {
             selectedUsers={selectedUsers}
             onOpenChat={openChat}
           />
-
-          {chatOpen && (
-            <ChatModal
-              isOpen={chatOpen}
-              onClose={() => {
-                setChatOpen(false);
-                setSelectedUsers([]);
-              }}
-              selectedUsers={selectedUsers}
-              nearbyUsers={nearbyUsers}
-              onUpdateNearbyUsers={fetchNearbyUsers}
-              onUpdateSelectedUsers={handleUpdateSelectedUsers}
-            />
-          )}
         </motion.div>
       ) : (
         <p className="text-lg text-gray-600 dark:text-gray-400">No location data available.</p>
       )}
     </div>
+
   );
 };
 
