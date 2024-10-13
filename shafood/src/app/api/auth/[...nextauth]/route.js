@@ -2,9 +2,11 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
-import { getUserByEmail, createUser, updateUser } from '@/app/models/User';
+import { getUserByEmail, createUser, updateUser, findOrCreateUser } from '@/app/models/User';
 import bcrypt from 'bcryptjs';
 import { initDatabase } from '@/app/lib/init-db';
+import clientPromise from '../../../lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 export const authOptions = {
   providers: [
@@ -28,7 +30,7 @@ export const authOptions = {
         }
         
         // Set user online status
-        await updateUser(user._id, { online: true }); // Update online status on login
+        await updateUser(user._id, { online: true });
 
         return { id: user._id.toString(), email: user.email, name: user.name };
       }
@@ -42,24 +44,21 @@ export const authOptions = {
       clientSecret: process.env.GITHUB_SECRET,
     }),
   ],
-  session: {
-    strategy: 'jwt',
-  },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account.provider === "google" || account.provider === "github") {
-        const existingUser = await getUserByEmail(user.email);
-        if (!existingUser) {
-          // Create a new user in your database
-          const userId = await createUser({
-            name: user.name,
-            email: user.email,
-            password: null, // Social login users don't have a password
-          });
-          user.id = userId.toString();
-        } else {
-          user.id = existingUser._id.toString();
-        }
+      if (account.provider === 'google' || account.provider === 'github') {
+        const userId = await findOrCreateUser({
+          email: profile.email,
+          name: profile.name || profile.login,
+          image: profile.picture || profile.avatar_url,
+        });
+        
+        await updateUser(userId, { 
+          online: true,
+          lastLogin: new Date(),
+        });
+
+        user.id = userId.toString();
       }
       return true;
     },
@@ -70,17 +69,17 @@ export const authOptions = {
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id;
+      if (session?.user) {
+        session.user.id = token.id;
+        const dbUser = await getUserByEmail(session.user.email);
+        session.user.online = dbUser.online;
+      }
       return session;
-    },
-    async signOut({ token }) {
-      // Set user offline status on logout
-      await updateUser(token.id, { online: false }); // Update online status on logout
-      return true;
     },
   },
   events: {
-    async signIn(message) {
+    async signOut({ token }) {
+      await updateUser(new ObjectId(token.id), { online: false });
     },
   },
   pages: {

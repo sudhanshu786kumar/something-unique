@@ -52,12 +52,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 to-red-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-800 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <motion.div
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl"
+        className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-10 rounded-xl shadow-2xl"
       >
         <div className="flex justify-center items-center">
           <Link href="/" className="text-2xl font-bold text-orange-600">ShaFood</Link>
@@ -67,11 +67,11 @@ export default function Login() {
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="mt-6 text-center text-3xl font-extrabold text-gray-900"
+            className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white"
           >
             Sign in to ShaFood
           </motion.h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Share delicious moments with friends
           </p>
         </div>

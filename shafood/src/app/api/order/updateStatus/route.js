@@ -20,7 +20,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { chatId, status, ordererId } = await req.json();
+  const { chatId, status, ordererId, resetUserStatuses } = await req.json();
 
   const client = await clientPromise;
   const db = client.db();
@@ -42,8 +42,11 @@ export async function POST(req) {
       lastUpdated: new Date()
     };
 
-    if (status === 'pending') {
+    if (status === 'pending' || resetUserStatuses) {
       updateData.ordererId = null;
+      updateData.userStatuses = {};
+    } else {
+      updateData.ordererId = ordererId;
     }
 
     const result = await chatsCollection.updateOne(
@@ -65,9 +68,19 @@ export async function POST(req) {
       ordererId: updatedChat.ordererId
     });
 
+    console.log('Pusher event triggered:', {
+      channel: `chat-${chatId}`,
+      event: 'order-update',
+      data: {
+        orderStatus: updatedChat.orderStatus,
+        userStatuses: updatedChat.userStatuses || {},
+        ordererId: updatedChat.ordererId
+      }
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating order status:', error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 });
   }
 }

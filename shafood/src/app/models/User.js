@@ -29,7 +29,6 @@ export async function getUserById(id) {
   return db.collection('users').findOne({ _id: new ObjectId(id) });
 }
 
-// Add this function to update the online status
 export async function updateUser(id, updateData) {
   const client = await clientPromise;
   const db = client.db();
@@ -51,9 +50,8 @@ export async function getAllUsers() {
   return db.collection('users').find({}).toArray();
 }
 
-// Define the updateUserPreferences function
 export const updateUserPreferences = async (userId, preferences) => {
-  const client=await clientPromise;
+  const client = await clientPromise;
   const db = client.db();
   const userCollection = db.collection('users');
   const result = await userCollection.updateOne(
@@ -63,23 +61,23 @@ export const updateUserPreferences = async (userId, preferences) => {
         ...preferences,
         preferences: preferences
       } 
-    } // Assuming preferences is an object containing user preferences
+    }
   );
   return result;
 };
 
-// Ensure you export the function
-
 export async function findOrCreateUser(userData) {
   const client = await clientPromise;
   const db = client.db();
+  const usersCollection = db.collection('users');
+
   const existingUser = await getUserByEmail(userData.email);
 
   if (existingUser) {
     return existingUser._id;
   }
 
-  const userWithDefaults = {
+  const newUser = {
     ...userData,
     isSharing: false,
     isOrdering: false,
@@ -88,7 +86,7 @@ export async function findOrCreateUser(userData) {
     createdAt: new Date(),
     updatedAt: new Date()
   };
-  const result = await db.collection('users').insertOne(userWithDefaults);
+
+  const result = await usersCollection.insertOne(newUser);
   return result.insertedId;
 }
-

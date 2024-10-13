@@ -52,6 +52,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
         if (response.ok) {
           console.log('Nearby users:', data);
           setNearbyUsers(data);
+        
           setIsDrawerOpen(true);
         } else {
           console.error('Error fetching nearby users:', data.error);
@@ -111,9 +112,11 @@ const LocationTracker = ({ preferences, onUpdate }) => {
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-md mx-auto relative">
+    <div className="w-full max-w-4xl mx-auto">
       {loadingLocation ? (
-        <Loader size="h-16 w-16" />
+        <div className="flex justify-center items-center h-64">
+          <Loader size="h-16 w-16" />
+        </div>
       ) : location ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -121,27 +124,31 @@ const LocationTracker = ({ preferences, onUpdate }) => {
           transition={{ duration: 0.5 }}
           className="flex flex-col items-center w-full"
         >
-          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-600 text-4xl mb-4 animate-bounce" />
-          <CuteMap latitude={location.latitude} longitude={location.longitude} />
-          <motion.button 
-            onClick={() => setPreferencesModalOpen(true)}
-            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 shadow-lg hover:shadow-xl"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Add Your Preferences
-          </motion.button>
-          {preferencesUpdated && (
+          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-600 dark:text-orange-400 text-4xl mb-4 animate-bounce" />
+          <div className="w-full max-w-lg mb-6">
+            <CuteMap latitude={location.latitude} longitude={location.longitude} />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
             <motion.button 
-              onClick={fetchNearbyUsers}
-              className="mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 shadow-lg hover:shadow-xl flex items-center"
+              onClick={() => setPreferencesModalOpen(true)}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 shadow-lg hover:shadow-xl"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <FontAwesomeIcon icon={faUserFriends} className="mr-2" />
-              Search Nearby
+              Add Your Preferences
             </motion.button>
-          )}
+            {preferencesUpdated && (
+              <motion.button 
+                onClick={fetchNearbyUsers}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FontAwesomeIcon icon={faUserFriends} className="mr-2" />
+                Search Nearby
+              </motion.button>
+            )}
+          </div>
           <PreferencesModal
             isOpen={preferencesModalOpen}
             onClose={() => setPreferencesModalOpen(false)}
@@ -164,17 +171,16 @@ const LocationTracker = ({ preferences, onUpdate }) => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="mt-4 p-4 bg-orange-100 dark:bg-gray-700 rounded-lg shadow-md text-center"
+                className="mt-8 p-6 bg-orange-100 dark:bg-gray-700 rounded-lg shadow-md text-center w-full max-w-md"
               >
-                <FontAwesomeIcon icon={faUserFriends} className="text-4xl text-orange-500 mb-2" />
-                <h3 className="text-xl font-bold text-orange-600 dark:text-orange-400 mb-2">No Nearby Users Found</h3>
+                <FontAwesomeIcon icon={faUserFriends} className="text-5xl text-orange-500 dark:text-orange-400 mb-4" />
+                <h3 className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-2">No Nearby Users Found</h3>
                 <p className="text-gray-600 dark:text-gray-300">
-                  Don&apos;t worry! Adjust your preferences or try again later to find your perfect food buddies.
+                  Don't worry! Adjust your preferences or try again later to find your perfect food buddies.
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
-
           <NearbyUsersDrawer
             isOpen={isDrawerOpen}
             onClose={() => setIsDrawerOpen(false)}
@@ -186,10 +192,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
           />
         </motion.div>
       ) : (
-        <p className="text-lg text-gray-600 dark:text-gray-400">No location data available.</p>
+        <p className="text-lg text-gray-600 dark:text-gray-400 text-center">No location data available.</p>
       )}
     </div>
-
   );
 };
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faUser, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { useSession } from 'next-auth/react';
 
 const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIcon, selectedUsers, onOpenChat }) => {
@@ -39,13 +39,20 @@ const NearbyUsersDrawer = ({ isOpen, onClose, users, onSelectUser, getProviderIc
               </div>
               <button
                 onClick={() => onSelectUser(user)}
-                className={`px-3 py-1 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition duration-300 ${
-                  selectedUsers.some((selectedUser) => selectedUser.id === user.id)
-                    ? 'bg-blue-100 dark:bg-blue-900'
-                    : ''
-                }`}
+                className={`px-3 py-1 rounded-full transition duration-300 flex items-center justify-center w-24
+                  ${selectedUsers.some((selectedUser) => selectedUser.id === user.id)
+                    ? 'bg-green-500 text-white'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                  }`}
               >
-                Select
+                {selectedUsers.some((selectedUser) => selectedUser.id === user.id) ? (
+                  <>
+                    <FontAwesomeIcon icon={faCheck} className="mr-2" />
+                    Selected
+                  </>
+                ) : (
+                  'Select'
+                )}
               </button>
             </li>
           ))}

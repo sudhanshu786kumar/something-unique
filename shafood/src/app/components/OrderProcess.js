@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo } from '@fortawesome/free-solid-svg-icons';
-import Tooltip from './Tooltip'; // Assume you have a Tooltip component
+import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck } from '@fortawesome/free-solid-svg-icons';
+import Tooltip from './Tooltip';
 import Pusher from 'pusher-js';
+import { toast } from 'react-toastify';
 
 const OrderProcess = ({ chatId, users, currentUserId }) => {
     const [orderStatus, setOrderStatus] = useState('pending');
@@ -11,23 +12,20 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     const [loading, setLoading] = useState(true);
     const [selectedOrderer, setSelectedOrderer] = useState(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [receivedCount, setReceivedCount] = useState(0);
 
     useEffect(() => {
         fetchOrderStatus();
-        console.log('Pusher configuration:', {
-            key: process.env.NEXT_PUBLIC_PUSHER_KEY,
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-        });
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
         });
 
         const channel = pusher.subscribe(`chat-${chatId}`);
         channel.bind('order-update', (data) => {
-            console.log('Received Pusher event:', data);
             setOrderStatus(data.orderStatus);
             setUserStatuses(data.userStatuses);
             setSelectedOrderer(data.ordererId);
+            updateReceivedCount(data.userStatuses);
         });
 
         return () => {
@@ -40,11 +38,10 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
         try {
             const response = await fetch(`/api/order/status?chatId=${chatId}`);
             const data = await response.json();
-            console.log("Order status data:", data);
-            console.log("orderer current user id:",currentUserId)
-            setOrderStatus(data?.orderStatus || 'pending');
+            setOrderStatus(data.orderStatus || 'pending');
             setUserStatuses(data.userStatuses || {});
             setSelectedOrderer(data.orderer || null);
+            updateReceivedCount(data.userStatuses || {});
         } catch (error) {
             console.error('Error fetching order status:', error);
         } finally {
@@ -52,22 +49,45 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
         }
     };
 
+    const updateReceivedCount = (statuses) => {
+        const count = Object.values(statuses).filter(status => status === 'received').length;
+        setReceivedCount(count);
+    };
+
     const updateStatus = async (status) => {
         if (status === 'ordered' && selectedOrderer !== currentUserId) {
-            alert('Only the selected orderer can mark the order as placed.');
+            toast.error('Only the selected orderer can mark the order as placed.');
             return;
         }
         try {
             const response = await fetch('/api/order/updateStatus', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatId, status, ordererId: selectedOrderer }),
+                body: JSON.stringify({ 
+                    chatId, 
+                    status, 
+                    ordererId: status === 'pending' ? null : selectedOrderer,
+                    resetUserStatuses: status === 'pending'
+                }),
             });
-            if (response.ok) {
-                // The server will trigger the Pusher event, so we don't need to update the state here
+            if (!response.ok) {
+                throw new Error('Failed to update order status');
+            }
+            const data = await response.json();
+            if (data.success) {
+                toast.success(`Order status updated to ${status}.`);
+                // Update local state immediately for better UX
+                setOrderStatus(status);
+                if (status === 'pending') {
+                    setUserStatuses({});
+                    setReceivedCount(0);
+                }
+            } else {
+                throw new Error('Failed to update order status');
             }
         } catch (error) {
             console.error('Error updating status:', error);
+            toast.error('Failed to update status. Please try again.');
         }
     };
 
@@ -97,12 +117,14 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     };
 
     const timelineSteps = [
-        { status: 'pending', icon: faShoppingCart, label: 'Select Orderer' },
-        { status: 'ordered', icon: faTruck, label: 'Order Placed' },
-        { status: 'received', icon: faHandshake, label: 'Order Received' },
+        { status: 'pending', label: 'Select Orderer', icon: faUser },
+        { status: 'ordered', label: 'Order Placed', icon: faShoppingCart },
+        { status: 'received', label: 'Order Received', icon: faCheckCircle },
     ];
 
-    const getCurrentStep = () => timelineSteps.findIndex(step => step.status === orderStatus);
+    const getCurrentStep = () => {
+        return timelineSteps.findIndex(step => step.status === orderStatus);
+    };
 
     if (loading) {
         return (
@@ -118,28 +140,24 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     }
 
     return (
-        <div className="h-full overflow-y-auto bg-white dark:bg-gray-800 p-6">
-            <motion.h2 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-3xl font-bold mb-6 text-orange-600 dark:text-orange-400"
-            >
-                Order Process
-            </motion.h2>
-            
+        <div className="p-4 h-full overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Order Process</h2>
+
+            <div className="flex flex-col md:flex-row gap-8">
             {/* Timeline */}
-            <div className="mb-8 relative">
-                <div className="absolute left-1/2 transform -translate-x-1/2 w-1 h-full bg-gray-200 dark:bg-gray-600"></div>
+                <div className="md:w-1/2">
+            <div className="relative mb-12">
+                <div className="absolute left-1/2 transform -translate-x-1/2 w-1 h-full bg-gray-200 dark:bg-gray-700"></div>
                 {timelineSteps.map((step, index) => (
-                    <motion.div 
+                    <motion.div
                         key={step.status}
-                        initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center mb-8 relative"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.2 }}
-                        className={`flex items-center mb-8 ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
                     >
-                        <div className={`w-1/2 ${index % 2 === 0 ? 'pr-8 text-right' : 'pl-8 text-left'}`}>
-                            <h3 className="text-lg font-semibold mb-2">{step.label}</h3>
+                        <div className={`w-1/2 ${index % 2 === 0 ? 'pr-8 text-right' : 'pl-8'}`}>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{step.label}</h3>
                             {orderStatus === step.status && (
                                 <motion.p 
                                     initial={{ opacity: 0 }}
@@ -164,165 +182,171 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                         </motion.div>
                     </motion.div>
                 ))}
+                    </div>
             </div>
-            
-            {/* User list */}
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-4 mb-6"
-            >
-                <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Participants</h3>
-                {users.map((user, index) => (
-                    <motion.div 
+
+                {/* User list and Action buttons */}
+                <div className="md:w-1/2">
+                    <div className="grid grid-cols-1 gap-4 mb-6">
+                {users.map(user => (
+                    <motion.div
                         key={user.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`flex items-center justify-between p-4 rounded-lg ${
+                        className={`p-4 rounded-lg ${
                             user.id === selectedOrderer 
-                                ? 'bg-orange-200 dark:bg-orange-700 border-4 border-orange-500 shadow-lg' // Made border thicker and added shadow
+                                ? 'bg-orange-200 dark:bg-orange-700 border-4 border-orange-500 shadow-lg'
                                 : 'bg-gray-100 dark:bg-gray-700'
                         }`}
                         whileHover={{ scale: 1.02 }}
                     >
-                        <div className="flex items-center">
-                            <FontAwesomeIcon 
-                                icon={user.id === selectedOrderer ? faUtensils : faUser} 
-                                className={`${user.id === selectedOrderer ? 'text-orange-600' : 'text-orange-500'} mr-3`} 
-                            />
-                            <span className="text-lg text-gray-800 dark:text-gray-200">
-                                {user.name}
-                                {user.id === selectedOrderer && (
-                                    <span className="ml-2 text-sm font-semibold text-orange-600">
-                                        (Selected Orderer)
-                                    </span>
-                                )}
-                            </span>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                            <motion.div
-                                animate={{ rotate: userStatuses[user.id] === 'ordered' ? 360 : 0 }}
-                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                            >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
                                 <FontAwesomeIcon 
-                                    icon={getStatusIcon(userStatuses[user.id])} 
-                                    className={`text-2xl ${userStatuses[user.id] === 'received' ? 'text-green-500' : 'text-orange-500'}`}
+                                    icon={user.id === selectedOrderer ? faUtensils : faUser} 
+                                    className={`${user.id === selectedOrderer ? 'text-orange-600' : 'text-orange-500'} mr-3`} 
                                 />
-                            </motion.div>
-                            {orderStatus === 'pending' && (
-                                <Tooltip content={user.id === selectedOrderer ? "Remove as orderer" : "Set as orderer"}>
-                                    <motion.button
-                                        onClick={() => toggleOrderer(user.id)}
-                                        className={`p-2 rounded-full ${
-                                            user.id === selectedOrderer
-                                                ? 'bg-red-500 hover:bg-red-600'
-                                                : 'bg-green-500 hover:bg-green-600'
-                                        } text-white`}
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                    >
-                                        <FontAwesomeIcon icon={user.id === selectedOrderer ? faTimes : faUtensils} />
-                                    </motion.button>
-                                </Tooltip>
-                            )}
+                                <span className="text-lg text-gray-800 dark:text-gray-200">
+                                    {user.name}
+                                    {user.id === currentUserId && " (You)"}
+                                    {user.id === selectedOrderer && (
+                                        <span className="ml-2 text-sm font-semibold text-orange-600">
+                                            (Orderer)
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <motion.div
+                                    animate={{ rotate: userStatuses[user.id] === 'ordered' ? 360 : 0 }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                >
+                                    <FontAwesomeIcon 
+                                        icon={getStatusIcon(userStatuses[user.id])} 
+                                        className={`text-2xl ${userStatuses[user.id] === 'received' ? 'text-green-500' : 'text-orange-500'}`}
+                                    />
+                                </motion.div>
+                                {orderStatus === 'pending' && (
+                                    <Tooltip content={user.id === selectedOrderer ? "Remove yourself as orderer" : "Set yourself as orderer"}>
+                                        <motion.button
+                                            onClick={() => toggleOrderer(user.id)}
+                                            className={`p-2 rounded-full ${
+                                                user.id === selectedOrderer
+                                                    ? 'bg-red-500 hover:bg-red-600'
+                                                    : 'bg-green-500 hover:bg-green-600'
+                                            } text-white`}
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            disabled={user.id !== currentUserId}
+                                        >
+                                            <FontAwesomeIcon icon={user.id === selectedOrderer ? faTimes : faUtensils} />
+                                        </motion.button>
+                                    </Tooltip>
+                                )}
+                            </div>
                         </div>
                     </motion.div>
                 ))}
-            </motion.div>
+            </div>
             
             {/* Action buttons */}
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-center space-x-4"
-            >
-                <motion.button 
+            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <ActionButton
                     onClick={() => updateStatus('ordered')}
-                    className={`px-6 py-3 rounded-full text-white font-semibold ${
-                        orderStatus === 'pending' && selectedOrderer === currentUserId
-                            ? 'bg-blue-500 hover:bg-blue-600'
-                            : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                    whileHover={orderStatus === 'pending' && selectedOrderer === currentUserId ? { scale: 1.05 } : {}}
-                    whileTap={orderStatus === 'pending' && selectedOrderer === currentUserId ? { scale: 0.95 } : {}}
                     disabled={orderStatus !== 'pending' || selectedOrderer !== currentUserId}
-                >
-                    Mark as Ordered
-                </motion.button>
-                <motion.button 
+                    icon={faShoppingCart}
+                    text="Mark as Ordered"
+                    color="blue"
+                />
+                <ActionButton
                     onClick={() => updateStatus('received')}
-                    className={`px-6 py-3 rounded-full text-white font-semibold ${
-                        orderStatus === 'ordered'
-                            ? 'bg-green-500 hover:bg-green-600'
-                            : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                    whileHover={orderStatus === 'ordered' ? { scale: 1.05 } : {}}
-                    whileTap={orderStatus === 'ordered' ? { scale: 0.95 } : {}}
-                    disabled={orderStatus !== 'ordered'}
-                >
-                    Mark as Received
-                </motion.button>
-                <motion.button 
+                    disabled={orderStatus !== 'ordered' || userStatuses[currentUserId] === 'received'}
+                    icon={receivedCount === users.length ? faCheckCircle : faUserCheck}
+                    text={`Mark as Received ${orderStatus === 'ordered' && receivedCount < users.length ? `(${receivedCount}/${users.length})` : ''}`}
+                    color="orange"
+                />
+                <ActionButton
                     onClick={() => setShowResetConfirm(true)}
-                    className={`px-6 py-3 rounded-full text-white font-semibold ${
-                        orderStatus !== 'pending'
-                            ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                    whileHover={orderStatus !== 'pending' ? { scale: 1.05 } : {}}
-                    whileTap={orderStatus !== 'pending' ? { scale: 0.95 } : {}}
-                    disabled={orderStatus === 'pending'}
-                >
-                    <FontAwesomeIcon icon={faUndo} className="mr-2" />
-                    Reset Order
-                </motion.button>
-            </motion.div>
+                    disabled={orderStatus !== 'received'}
+                    icon={faUndo}
+                    text="Reset Order"
+                    color="yellow"
+                />
+            </div>
+
+            {orderStatus === 'ordered' && receivedCount < users.length && (
+                <p className="text-center mt-4 text-orange-600 dark:text-orange-400">
+                    All users must mark the order as received before it can be completed.
+                </p>
+            )}
+                </div>
+            </div>
 
             {/* Reset Confirmation Modal */}
             <AnimatePresence>
                 {showResetConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg"
-                        >
-                            <h3 className="text-xl font-bold mb-4">Reset Order?</h3>
-                            <p className="mb-4">Are you sure you want to reset the order process? This action cannot be undone.</p>
-                            <div className="flex justify-end space-x-4">
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => setShowResetConfirm(false)}
-                                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded"
-                                >
-                                    Cancel
-                                </motion.button>
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => {
-                                        updateStatus('pending');
-                                        setShowResetConfirm(false);
-                                    }}
-                                    className="px-4 py-2 bg-red-500 text-white rounded"
-                                >
-                                    Reset
-                                </motion.button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
+                    <ResetConfirmationModal
+                        onCancel={() => setShowResetConfirm(false)}
+                        onConfirm={() => {
+                            updateStatus('pending');
+                            setShowResetConfirm(false);
+                        }}
+                    />
                 )}
             </AnimatePresence>
         </div>
     );
 }
+
+
+const ActionButton = ({ onClick, disabled, icon, text, color }) => (
+    <motion.button 
+        onClick={onClick}
+        className={`px-6 py-3 rounded-full text-white font-semibold w-full sm:w-auto
+            ${disabled ? 'bg-gray-400 cursor-not-allowed' : `bg-${color}-500 hover:bg-${color}-600`}`}
+        whileHover={!disabled ? { scale: 1.05 } : {}}
+        whileTap={!disabled ? { scale: 0.95 } : {}}
+        disabled={disabled}
+    >
+        <FontAwesomeIcon icon={icon} className="mr-2" />
+        {text}
+    </motion.button>
+);
+
+const ResetConfirmationModal = ({ onCancel, onConfirm }) => (
+    <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+    >
+        <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-sm w-full"
+        >
+            <h3 className="text-xl font-bold mb-4">Reset Order?</h3>
+            <p className="mb-4">Are you sure you want to reset the order process? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-4">
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onCancel}
+                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded"
+                >
+                    Cancel
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onConfirm}
+                    className="px-4 py-2 bg-red-500 text-white rounded"
+                >
+                    Reset
+                </motion.button>
+            </div>
+        </motion.div>
+    </motion.div>
+);
+
 
 export default OrderProcess;

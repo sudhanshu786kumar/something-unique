@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/customScrollbar.css';
@@ -50,7 +50,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const [isOrderProcessOpen, setIsOrderProcessOpen] = useState(false);
+  // const [isOrderProcessOpen, setIsOrderProcessOpen] = useState(false);
 
   const emojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '👀'];
 
@@ -378,6 +378,19 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
     return null; // or return a loading indicator
   }
 
+  if (loadingMessages) {
+    return (
+      <div className="flex justify-center items-center h-full w-full">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <FontAwesomeIcon icon={faSpinner} size="3x" className="text-orange-500" />
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 overflow-hidden">
       <div className="bg-blue-500 text-white p-3">
@@ -487,13 +500,6 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
             className="bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <FontAwesomeIcon icon={faPaperPlane} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsOrderProcessOpen(true)}
-            className="bg-green-500 text-white rounded-full p-2 hover:bg-green-600 transition focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <FontAwesomeIcon icon={faUtensils} />
           </button>
         </form>
       </div>
