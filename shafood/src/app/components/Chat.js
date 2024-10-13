@@ -81,7 +81,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
       console.error("Error in findOrCreateChatSession:", error);
       toast.error("Failed to update chat session. Please try again.");
     }
-  }, [session.user.id, onChatIdChange]);
+  }, [onChatIdChange]);
 
   useEffect(() => {
     if (selectedUsers && selectedUsers.length > 1) {
