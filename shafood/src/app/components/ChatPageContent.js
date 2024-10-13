@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUtensils, faShoppingBasket, faCartPlus, faComments, faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faUtensils, faShoppingBasket, faCartPlus, faComments, faBars, faTimes, faBell } from '@fortawesome/free-solid-svg-icons';
 import Chat from './Chat';
 import OrderProcess from './OrderProcess';
 import { useTheme } from 'next-themes';
@@ -18,6 +18,7 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
   const [chatId, setChatId] = useState('');
   const { theme, setTheme } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -85,12 +86,22 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
       <header className="bg-white dark:bg-gray-800 shadow-md p-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-orange-600 dark:text-orange-400">Group Chat</h1>
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden text-gray-600 dark:text-gray-400"
-          >
-            <FontAwesomeIcon icon={isMobileMenuOpen ? faTimes : faBars} size="lg" />
-          </button>
+          <div className="flex items-center">
+            {unreadMessages > 0 && (
+              <div className="mr-4 relative">
+                <FontAwesomeIcon icon={faBell} className="text-orange-500" />
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadMessages}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden text-gray-600 dark:text-gray-400"
+            >
+              <FontAwesomeIcon icon={isMobileMenuOpen ? faTimes : faBars} size="lg" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -166,6 +177,7 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
               onUpdateSelectedUsers={setSelectedUsers}
               onChatIdChange={setChatId}
               chatId={chatId}
+              onUnreadMessagesChange={setUnreadMessages}
             />
           )}
           {activeTab === 'order' && (

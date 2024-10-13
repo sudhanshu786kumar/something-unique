@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -12,16 +12,41 @@ const Layout = ({ children, walletBalance = 0 }) => {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleLogout = async () => {
+  useEffect(() => {
     if (session) {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: session.user.id }),
-      });
+      setUserOnline();
     }
-    signOut();
-    router.push('/login');
+    return () => {
+      if (session) {
+        setUserOffline();
+      }
+    };
+  }, [session]);
+
+  const setUserOnline = async () => {
+    try {
+      await fetch('/api/user/setOnline', { method: 'POST' });
+    } catch (error) {
+      console.error('Error setting user online:', error);
+    }
+  };
+
+  const setUserOffline = async () => {
+    try {
+      await fetch('/api/user/setOffline', { method: 'POST' });
+    } catch (error) {
+      console.error('Error setting user offline:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await setUserOffline();
+      await signOut({ redirect: false });
+      router.push('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
   return (

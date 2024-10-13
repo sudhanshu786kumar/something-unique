@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck, faCircle } from '@fortawesome/free-solid-svg-icons';
 import Tooltip from './Tooltip';
 import Pusher from 'pusher-js';
 import { toast } from 'react-toastify';
@@ -13,6 +13,7 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
     const [selectedOrderer, setSelectedOrderer] = useState(null);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [receivedCount, setReceivedCount] = useState(0);
+    const [onlineUsers, setOnlineUsers] = useState(new Set());
 
     // Use useMemo to create a unique list of users
     const uniqueUsers = useMemo(() => {
@@ -29,20 +30,42 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
         fetchOrderStatus();
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+            authEndpoint: `/api/pusher/auth`,
         });
 
         const channel = pusher.subscribe(`chat-${chatId}`);
-        channel.bind('order-update', (data) => {
-            setOrderStatus(data.orderStatus);
-            setUserStatuses(data.userStatuses);
-            setSelectedOrderer(data.ordererId);
-            updateReceivedCount(data.userStatuses);
+        channel.bind('order-update', handleOrderUpdate);
+
+        const presenceChannel = pusher.subscribe(`presence-chat-${chatId}`);
+        
+        presenceChannel.bind('pusher:subscription_succeeded', (members) => {
+            setOnlineUsers(new Set(Object.keys(members.members)));
+        });
+
+        presenceChannel.bind('pusher:member_added', (member) => {
+            setOnlineUsers((prev) => new Set(prev).add(member.id));
+        });
+
+        presenceChannel.bind('pusher:member_removed', (member) => {
+            setOnlineUsers((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(member.id);
+                return newSet;
+            });
         });
 
         return () => {
             pusher.unsubscribe(`chat-${chatId}`);
+            pusher.unsubscribe(`presence-chat-${chatId}`);
         };
     }, [chatId]);
+
+    const handleOrderUpdate = (data) => {
+        setOrderStatus(data.orderStatus);
+        setUserStatuses(data.userStatuses);
+        setSelectedOrderer(data.ordererId);
+        updateReceivedCount(data.userStatuses);
+    };
 
     const fetchOrderStatus = async () => {
         setLoading(true);
@@ -70,6 +93,50 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
             toast.error('Only the selected orderer can mark the order as placed.');
             return;
         }
+        if (status === 'received') {
+            // Update the user's status to 'received'
+            const updatedUserStatuses = {
+                ...userStatuses,
+                [currentUserId]: 'received'
+            };
+            const allReceived = uniqueUsers.every(user => updatedUserStatuses[user.id] === 'received');
+            
+            try {
+                const response = await fetch('/api/order/updateUserStatus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        chatId, 
+                        userId: currentUserId,
+                        status: 'received'
+                    }),
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to update user status');
+                }
+                const data = await response.json();
+                if (data.success) {
+                    setUserStatuses(updatedUserStatuses);
+                    setReceivedCount(Object.values(updatedUserStatuses).filter(status => status === 'received').length);
+                    toast.success('Your order status has been marked as received.');
+                    
+                    if (allReceived) {
+                        // If all users have received, update the order status
+                        await updateOrderStatus('received');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating user status:', error);
+                toast.error('Failed to update your status. Please try again.');
+            }
+            return;
+        }
+
+        // For other statuses (pending, ordered)
+        await updateOrderStatus(status);
+    };
+
+    const updateOrderStatus = async (status) => {
         try {
             const response = await fetch('/api/order/updateStatus', {
                 method: 'POST',
@@ -87,7 +154,6 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
             const data = await response.json();
             if (data.success) {
                 toast.success(`Order status updated to ${status}.`);
-                // Update local state immediately for better UX
                 setOrderStatus(status);
                 if (status === 'pending') {
                     setUserStatuses({});
@@ -115,8 +181,11 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
             });
             if (response.ok) {
                 const data = await response.json();
-                console.log("Toggle orderer response:", data);
-                // The server will trigger the Pusher event, so we don't need to update the state here
+                if (userId === currentUserId) {
+                    toast.success(userId === selectedOrderer ? "You are no longer the orderer." : "You are now the orderer.");
+                } else {
+                    toast.success(userId === selectedOrderer ? `${data.ordererName} is no longer the orderer.` : `${data.ordererName} is now the orderer.`);
+                }
             }
         } catch (error) {
             console.error('Error updating orderer:', error);
@@ -230,6 +299,10 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                                         </span>
                                     )}
                                 </span>
+                                <FontAwesomeIcon 
+                                    icon={faCircle} 
+                                    className={`ml-2 text-xs ${onlineUsers.has(user.id) ? 'text-green-500' : 'text-gray-400'}`} 
+                                />
                             </div>
                             <div className="flex items-center space-x-3">
                                 <motion.div
@@ -243,6 +316,13 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                                 </motion.div>
                             </div>
                         </div>
+                        {user.id === currentUserId && orderStatus === 'pending' && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                                {user.id === selectedOrderer 
+                                    ? "Click to remove yourself as orderer" 
+                                    : "Click to set yourself as orderer"}
+                            </p>
+                        )}
                     </motion.div>
                 ))}
             </div>
@@ -259,8 +339,8 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                 <ActionButton
                     onClick={() => updateStatus('received')}
                     disabled={orderStatus !== 'ordered' || userStatuses[currentUserId] === 'received'}
-                    icon={receivedCount === users.length ? faCheckCircle : faUserCheck}
-                    text={`Mark as Received ${orderStatus === 'ordered' && receivedCount < users.length ? `(${receivedCount}/${users.length})` : ''}`}
+                    icon={receivedCount === uniqueUsers.length ? faCheckCircle : faUserCheck}
+                    text={`Mark as Received ${orderStatus === 'ordered' ? `(${receivedCount}/${uniqueUsers.length})` : ''}`}
                     color="orange"
                 />
                 <ActionButton
@@ -272,7 +352,7 @@ const OrderProcess = ({ chatId, users, currentUserId }) => {
                 />
             </div>
 
-            {orderStatus === 'ordered' && receivedCount < users.length && (
+            {orderStatus === 'ordered' && receivedCount < uniqueUsers.length && (
                 <p className="text-center mt-4 text-orange-600 dark:text-orange-400">
                     All users must mark the order as received before it can be completed.
                 </p>

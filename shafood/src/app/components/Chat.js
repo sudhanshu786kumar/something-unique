@@ -4,12 +4,14 @@ import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner, faArrowLeft, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/customScrollbar.css';
 import OrderProcess from './OrderProcess';
+import { useRouter } from 'next/navigation';
 
+const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
 
 const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   <div className="absolute inset-0 bg-white dark:bg-gray-800 z-10 p-4">
@@ -35,7 +37,7 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   </div>
 );
 
-const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose }) => {
+const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, onUnreadMessagesChange }) => {
   const { data: session } = useSession();
  
   const [messages, setMessages] = useState([]);
@@ -59,6 +61,10 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
   const [hasMore, setHasMore] = useState(true);
 
   const [showBackButton, setShowBackButton] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+
+  const router = useRouter();
+  const [isTabActive, setIsTabActive] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -79,6 +85,21 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabActive(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Preload the sound
+    notificationSound.load();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -142,6 +163,37 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
       findOrCreateChatSession(userIds);
     }
   }, [selectedUsers, findOrCreateChatSession]);
+
+  useEffect(() => {
+    if (chatId) {
+      const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+        authEndpoint: '/api/pusher/auth',
+      });
+
+      const channel = pusher.subscribe(`presence-chat-${chatId}`);
+      
+      channel.bind('pusher:subscription_succeeded', (members) => {
+        setOnlineUsers(new Set(Object.keys(members.members)));
+      });
+
+      channel.bind('pusher:member_added', (member) => {
+        setOnlineUsers((prev) => new Set(prev).add(member.id));
+      });
+
+      channel.bind('pusher:member_removed', (member) => {
+        setOnlineUsers((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(member.id);
+          return newSet;
+        });
+      });
+
+      return () => {
+        pusher.unsubscribe(`presence-chat-${chatId}`);
+      };
+    }
+  }, [chatId]);
 
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
@@ -270,17 +322,22 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
   const initializePusher = (chatId) => {
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: '/api/pusher/auth',
     });
 
     const channel = pusher.subscribe(`chat-${chatId}`);
     channel.bind('new-message', (data) => {
-      // Check if the message already exists to prevent duplicates
       setMessages((prevMessages) => {
         const messageExists = prevMessages.some(msg => msg.id === data.id);
         if (!messageExists) {
+          if (!isTabActive) {
+            playNotificationSound();
+            showNotification(data.sender, data.text);
+            onUnreadMessagesChange(prev => prev + 1);
+          }
           return [...prevMessages, data];
         }
-        return prevMessages; // Return the previous messages if it already exists
+        return prevMessages;
       });
     });
 
@@ -450,6 +507,27 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
     }
   };
 
+  const playNotificationSound = () => {
+    notificationSound.play().catch(error => {
+      console.error('Error playing sound:', error);
+      // Fallback to browser's built-in notification sound
+      new Notification('New Message', { silent: false });
+    });
+  };
+
+  const showNotification = (sender, message) => {
+    toast.info(`New message from ${sender}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      onClick: () => router.push('/chat')
+    });
+  };
+
   if (!selectedUsers) {
     return null; // or return a loading indicator
   }
@@ -529,7 +607,13 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
               className={`flex ${msg.sender === session.user.name ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`max-w-[70%] ${msg.sender === session.user.name ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'} rounded-lg p-2 shadow`}>
-                <p className="font-semibold text-xs mb-1">{msg.sender}</p>
+                <div className="flex items-center mb-1">
+                  <p className="font-semibold text-xs">{msg.sender}</p>
+                  <FontAwesomeIcon 
+                    icon={faCircle} 
+                    className={`ml-2 text-xs ${onlineUsers.has(msg.senderId) ? 'text-green-500' : 'text-gray-400'}`} 
+                  />
+                </div>
                 {renderMessage(msg)}
                 <div className="flex justify-between items-center mt-1">
                   <div className="text-xs opacity-75">
