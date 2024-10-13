@@ -536,15 +536,6 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose })
           </div>
         </div>
       )}
-
-      {isOrderProcessOpen && (
-        <OrderProcess
-          chatId={chatId}
-          users={selectedUsers}
-          currentUserId={session.user.id}
-          onClose={() => setIsOrderProcessOpen(false)}
-        />
-      )}
     </div>
   );
 };
