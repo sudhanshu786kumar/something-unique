@@ -59,10 +59,20 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
         {/* Left sidebar */}
         <div className={`${isMobileMenuOpen ? 'fixed inset-0 z-10' : 'hidden'} md:relative md:block md:w-1/4 bg-orange-50 dark:bg-gray-800 overflow-y-auto`}>
           <div className="p-4">
+            {/* Add close button for mobile view */}
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden absolute top-4 right-4 text-gray-600 dark:text-gray-400"
+            >
+              <FontAwesomeIcon icon={faTimes} size="lg" />
+            </button>
             <ul className="space-y-4">
               <li>
                 <button
-                  onClick={() => setActiveTab('chat')}
+                  onClick={() => {
+                    setActiveTab('chat');
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`flex items-center w-full p-2 rounded-lg transition-colors ${
                     activeTab === 'chat'
                       ? 'bg-orange-200 dark:bg-orange-600'
