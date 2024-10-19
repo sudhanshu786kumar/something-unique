@@ -115,7 +115,7 @@ const ChatModal = ({ isOpen, onClose, selectedUsers: initialSelectedUsers, nearb
               >
                 <FontAwesomeIcon icon={faComments} className="mr-2 text-orange-600 dark:text-orange-400" />
                 <span className="text-gray-800 dark:text-white">Chat</span>
-              </button> 
+              </button>  
             </li>
             {combinedProviders.map(provider => (
               <li key={provider} className="flex items-center">
