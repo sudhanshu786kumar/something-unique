@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🍽️ Shafood
 
-## Getting Started
+![Shafood Logo](https://your-logo-url-here.com/logo.png)
 
-First, run the development server:
+## 🚀 Revolutionizing Food Delivery
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Shafood is a cutting-edge food ordering sharing platform that's transforming the landscape of food delivery. By connecting users and consolidating orders, we're making food delivery more affordable, sustainable, and community-driven.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+🌐 **[Check out Shafood](https://freeshafood.vercel.app/)**
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## ✨ Key Features
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+- 💰 **Reduced Delivery Charges**: Save money by sharing orders with nearby users
+- 💬 **Real-time Messaging**: Seamless coordination between users, restaurants, and delivery services
+- 🌿 **Eco-Friendly**: Contribute to a greener planet by reducing delivery miles
+- 🔒 **Secure & Reliable**: Built with cutting-edge technologies for optimal performance
 
-## Learn More
+## 🛠️ Technologies Used
 
-To learn more about Next.js, take a look at the following resources:
+- ![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)
+- ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+- ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🤝 Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more details. Note that this project is under a restricted license that only allows contributions back to the original repository.
 
-## Deploy on Vercel
+## 📜 License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This project is licensed under the Shafood Restricted Contribution License - see the [LICENSE](LICENSE) file for details. This license only allows viewing and contributing to the original repository. Any other use, including redistribution or commercial use, is strictly prohibited without explicit permission from the copyright holder.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## 📞 Contact
+
+For any queries or support, please contact us at [support@shafood.com](mailto:support@shafood.com).
+
+---
+
+<p align="center">
+  Join the Shafood community today and experience the future of food ordering - 
+  <br>
+  <strong>smarter, greener, and more cost-effective!</strong>
+</p>
