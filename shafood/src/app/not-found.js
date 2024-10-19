@@ -37,7 +37,7 @@ export default function NotFound() {
               isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
             }`}
           >
-            The page you're looking for seems to have wandered off the menu.
+            The page you&apos;re looking for seems to have wandered off the menu.
           </p>
           
           <div 
