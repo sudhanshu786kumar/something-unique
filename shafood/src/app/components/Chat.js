@@ -37,12 +37,20 @@ const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
   </div>
 );
 
-const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, onUnreadMessagesChange }) => {
+const Chat = ({ 
+  selectedUsers, 
+  onUpdateSelectedUsers, 
+  onChatIdChange, 
+  chatId, 
+  onUnreadMessagesChange, 
+  onlineUsers,
+  setOnlineUsers,
+  onClose // Add this prop
+}) => {
   const { data: session } = useSession();
  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [chatId, setChatId] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const messagesEndRef = useRef(null);
@@ -61,7 +69,6 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
   const [hasMore, setHasMore] = useState(true);
 
   const [showBackButton, setShowBackButton] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   const router = useRouter();
   const [isTabActive, setIsTabActive] = useState(true);
@@ -126,7 +133,6 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
 
       if (response.ok) {
         const { chatId } = await response.json();
-        setChatId(chatId);
         onChatIdChange(chatId);
         fetchMessages(chatId);
         initializePusher(chatId);
@@ -193,7 +199,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
         pusher.unsubscribe(`presence-chat-${chatId}`);
       };
     }
-  }, [chatId]);
+  }, [chatId, setOnlineUsers]);
 
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
@@ -499,11 +505,16 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
     }
   }, [hasMore, loadingMessages, loadMoreMessages]);
 
-  const handleBack = () => {
-    if (showMenu) {
-      setShowMenu(false);
-    } else if (showBackButton) {
-      onClose(); // This should navigate back to the main chat interface
+  const handleClose = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    } else {
+      // Fallback behavior if onClose is not provided
+      console.warn('onClose function not provided to Chat component');
+      // You might want to add some default behavior here, like resetting the chat state
+      setMessages([]);
+      setNewMessage('');
+      setChatId('');
     }
   };
 
@@ -551,7 +562,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
         <div className="flex justify-between items-center mb-2">
           {(isMobile || showBackButton) && (
             <button
-              onClick={handleBack}
+              onClick={handleClose}
               className="text-white hover:text-gray-200 focus:outline-none"
             >
               <FontAwesomeIcon icon={faArrowLeft} />
@@ -562,7 +573,7 @@ const Chat = ({ selectedUsers, onUpdateSelectedUsers, onChatIdChange, onClose, o
           </h2>
           {!isMobile && (
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="text-white hover:text-gray-200 focus:outline-none"
             >
               <FontAwesomeIcon icon={faTimes} />

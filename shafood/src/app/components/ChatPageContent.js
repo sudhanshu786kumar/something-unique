@@ -7,6 +7,7 @@ import { faUtensils, faShoppingBasket, faCartPlus, faComments, faBars, faTimes, 
 import Chat from './Chat';
 import OrderProcess from './OrderProcess';
 import { useTheme } from 'next-themes';
+import Pusher from 'pusher-js';
 
 const ChatPageContent = ({ initialSelectedUsers }) => {
   const router = useRouter();
@@ -19,12 +20,45 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
   const { theme, setTheme } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+
+  // Add this after the state declarations
+  const uniqueUsers = Array.from(new Set(selectedUsers.map(user => JSON.stringify(user))))
+    .map(userString => JSON.parse(userString));
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/dashboard');
     }
-  }, [status, router]);
+
+    // Initialize Pusher and subscribe to the presence channel
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: `/api/pusher/auth`,
+    });
+
+    const presenceChannel = pusher.subscribe(`presence-chat-${chatId}`);
+    
+    presenceChannel.bind('pusher:subscription_succeeded', (members) => {
+      setOnlineUsers(new Set(Object.keys(members.members)));
+    });
+
+    presenceChannel.bind('pusher:member_added', (member) => {
+      setOnlineUsers((prev) => new Set(prev).add(member.id));
+    });
+
+    presenceChannel.bind('pusher:member_removed', (member) => {
+      setOnlineUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(member.id);
+        return newSet;
+      });
+    });
+
+    return () => {
+      pusher.unsubscribe(`presence-chat-${chatId}`);
+    };
+  }, [status, router, chatId]);
 
   const providerUrls = {
     Zepto: 'https://www.zeptonow.com/',
@@ -81,6 +115,14 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
     </div>
   );
 
+  const handleCloseChat = () => {
+    // Define what should happen when the chat is closed
+    // For example, you might want to reset some state or navigate to a different page
+    setActiveTab('dashboard'); // Assuming you have a dashboard tab
+    setChatId('');
+    setSelectedUsers([]);
+  };
+
   return (
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-md p-4">
@@ -135,7 +177,10 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
               </li>
               <li>
                 <button
-                  onClick={() => setActiveTab('order')}
+                  onClick={() => {
+                    setActiveTab('order')
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`flex items-center w-full p-2 rounded-lg transition-colors ${
                     activeTab === 'order'
                       ? 'bg-orange-200 dark:bg-orange-600'
@@ -165,6 +210,17 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
                   ))}
                 </ul>
               </li>
+              <li>
+                <h4 className="text-md font-semibold mb-2 text-gray-600 dark:text-gray-400">Group Members</h4>
+                <ul className="space-y-2">
+                  {uniqueUsers.map(user => (
+                    <li key={user.id} className="flex items-center">
+                      <span className={`w-2 h-2 rounded-full mr-2 ${onlineUsers.has(user.id) ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      <span className="text-gray-800 dark:text-white">{user.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
             </ul>
           </div>
         </div>
@@ -178,6 +234,9 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
               onChatIdChange={setChatId}
               chatId={chatId}
               onUnreadMessagesChange={setUnreadMessages}
+              onlineUsers={onlineUsers}
+              setOnlineUsers={setOnlineUsers}
+              onClose={handleCloseChat}
             />
           )}
           {activeTab === 'order' && (
@@ -185,6 +244,7 @@ const ChatPageContent = ({ initialSelectedUsers }) => {
               chatId={chatId}
               users={selectedUsers}
               currentUserId={session?.user?.id}
+              onlineUsers={onlineUsers}
             />
           )}
         </div>
