@@ -81,7 +81,7 @@ export default function AboutContent() {
 
               <h2 className="text-2xl font-semibold text-orange-600 mt-8">Join Us</h2>
               <p>
-                Whether you're planning a casual lunch with coworkers, a dinner party with friends, or just looking to share the cost of delivery, ShaFood is here to make your group dining experience smooth and enjoyable. Join us today and discover a new way to dine together!
+                Whether you&apos;re planning a casual lunch with coworkers, a dinner party with friends, or just looking to share the cost of delivery, ShaFood is here to make your group dining experience smooth and enjoyable. Join us today and discover a new way to dine together!
               </p>
             </div>
 
