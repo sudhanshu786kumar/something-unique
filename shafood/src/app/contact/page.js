@@ -47,15 +47,15 @@ export default function Contact() {
               <div className="space-y-2">
                 <p className="flex items-center text-gray-600">
                   <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-orange-500" />
-                  support@shafood.com
+                  sudhanshu786kumar@gmail.com
                 </p>
                 <p className="flex items-center text-gray-600">
                   <FontAwesomeIcon icon={faPhone} className="mr-2 text-orange-500" />
-                  +1 (555) 123-4567
+                  +91 8770393707
                 </p>
                 <p className="flex items-center text-gray-600">
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-orange-500" />
-                  123 ShaFood Street, Foodie City, FC 12345
+                  Hinjewadi phase 1, marungi road, Pune, Maharashtra, PIN: 411057
                 </p>
               </div>
             </div>
@@ -118,7 +118,8 @@ export default function Contact() {
           )}
 
           <footer className="text-center mt-8 text-sm text-gray-600">
-            &copy; {new Date().getFullYear()} ShaFood. All rights reserved.
+            <p>&copy; {new Date().getFullYear()} ShaFood. All rights reserved.</p>
+            <p>Registered & Operational Address: Hinjewadi phase 1, marungi road, Pune, Maharashtra, PIN: 411057</p>
           </footer>
         </motion.div>
       </div>

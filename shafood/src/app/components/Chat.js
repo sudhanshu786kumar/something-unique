@@ -3,75 +3,82 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 import { motion } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes, faSmile, faUserPlus, faMapMarkerAlt, faMapPin, faFile, faPlus, faUtensils, faSpinner, faArrowLeft, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/customScrollbar.css';
-import OrderProcess from './OrderProcess';
 import { useRouter } from 'next/navigation';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPaperPlane, faTimes, faMapMarkerAlt, faMapPin, faFile, faPlus, faSpinner, faCircle } from '@fortawesome/free-solid-svg-icons';
 
 const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
-
-const NearbyUsersList = ({ nearbyUsers, onAddUser, onClose }) => (
-  <div className="absolute inset-0 bg-white dark:bg-gray-800 z-10 p-4">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold">Add Users to Chat</h3>
-      <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-        <FontAwesomeIcon icon={faTimes} />
-      </button>
-    </div>
-    <ul className="space-y-2">
-      {nearbyUsers.map(user => (
-        <li key={user.id} className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
-          <span>{user.name}</span>
-          <button
-            onClick={() => onAddUser(user.id)}
-            className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-          >
-            Add
-          </button>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
 
 const Chat = ({ 
   selectedUsers, 
   onUpdateSelectedUsers, 
   onChatIdChange, 
-  chatId, 
+  initialChatId,
+  initialMessages,
+  hasMore: initialHasMore,
   onUnreadMessagesChange, 
-  onlineUsers,
-  setOnlineUsers,
-  onClose // Add this prop
+  onlineUsers, // Add this prop
+  onClose
 }) => {
-  const { data: session } = useSession();
- 
-  const [messages, setMessages] = useState([]);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const [messages, setMessages] = useState(initialMessages || []);
+  const [chatId, setChatId] = useState(initialChatId);
   const [newMessage, setNewMessage] = useState('');
-  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const [showNearbyUsers, setShowNearbyUsers] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
   const emojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '👀'];
 
   const [isMobile, setIsMobile] = useState(false);
-  const [activeView, setActiveView] = useState('chat'); // 'chat', 'nearbyUsers', 'emojiPicker'
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(initialHasMore);
 
   const [showBackButton, setShowBackButton] = useState(false);
-
-  const router = useRouter();
   const [isTabActive, setIsTabActive] = useState(true);
+
+  const findOrCreateChatSession = useCallback(async (userIds) => {
+    if (!session || !session.user) {
+      console.error("Session or user is not available");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/chat/find-or-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds }),
+      });
+
+      if (response.ok) {
+        const { chatId } = await response.json();
+        setChatId(chatId);
+        onChatIdChange(chatId);
+        fetchMessages(chatId);
+      } else {
+        throw new Error("Failed to create or update chat session");
+      }
+    } catch (error) {
+      console.error("Error in findOrCreateChatSession:", error);
+      toast.error("Failed to update chat session. Please try again.");
+    }
+  }, [session, onChatIdChange]);
+
+  useEffect(() => {
+    if (selectedUsers && selectedUsers.length > 0) {
+      const userIds = selectedUsers.map(user => user.id);
+      findOrCreateChatSession(userIds);
+    }
+  }, [selectedUsers, findOrCreateChatSession]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -110,40 +117,52 @@ const Chat = ({
     };
   }, []);
 
-  const findOrCreateChatSession = useCallback(async (userIds) => {
-    if (!session || !session.user) {
-      toast.error("You must be logged in to start a chat.");
-      return;
-    }
+  const initializePusher = useCallback((chatId) => {
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: '/api/pusher/auth',
+    });
 
-    // Ensure the current user is always included
-    const allUserIds = Array.from(new Set([...userIds, session.user.id]));
-
-    if (allUserIds.length < 2) {
-      toast.error("Please select at least one other user to start a chat.");
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/chat/find-or-create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: allUserIds }),
+    const channel = pusher.subscribe(`chat-${chatId}`);
+    channel.bind('new-message', (data) => {
+      setMessages((prevMessages) => {
+        const messageExists = prevMessages.some(msg => msg.id === data.id);
+        if (!messageExists) {
+          if (!isTabActive) {
+            playNotificationSound();
+            showNotification(data.sender, data.text);
+            onUnreadMessagesChange(prev => prev + 1);
+          }
+          return [...prevMessages, data];
+        }
+        return prevMessages;
       });
+    });
 
-      if (response.ok) {
-        const { chatId } = await response.json();
-        onChatIdChange(chatId);
-        fetchMessages(chatId);
-        initializePusher(chatId);
-      } else {
-        throw new Error("Failed to create or update chat session");
+    channel.bind('typing', (data) => {
+      if (data.sender !== session?.user?.name) {
+        setTypingUsers((prev) => new Set(prev).add(data.sender));
+        setTimeout(() => {
+          setTypingUsers((prev) => {
+            const updated = new Set(prev);
+            updated.delete(data.sender);
+            return updated;
+          });
+        }, 2000);
       }
-    } catch (error) {
-      console.error("Error in findOrCreateChatSession:", error);
-      toast.error("Failed to update chat session. Please try again.");
+    });
+
+    return () => {
+      pusher.unsubscribe(`chat-${chatId}`);
+    };
+  }, [session, isTabActive, onUnreadMessagesChange]);
+
+  useEffect(() => {
+    if (chatId) {
+      const cleanup = initializePusher(chatId);
+      return () => cleanup();
     }
-  }, [onChatIdChange, session]);
+  }, [chatId, initializePusher]);
 
   useEffect(() => {
     if (session && session.user) {
@@ -162,44 +181,6 @@ const Chat = ({
       }
     }
   }, [session, selectedUsers, onUpdateSelectedUsers]);
-
-  useEffect(() => {
-    if (selectedUsers && selectedUsers.length > 0) {
-      const userIds = selectedUsers.map(user => user.id);
-      findOrCreateChatSession(userIds);
-    }
-  }, [selectedUsers, findOrCreateChatSession]);
-
-  useEffect(() => {
-    if (chatId) {
-      const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-        authEndpoint: '/api/pusher/auth',
-      });
-
-      const channel = pusher.subscribe(`presence-chat-${chatId}`);
-      
-      channel.bind('pusher:subscription_succeeded', (members) => {
-        setOnlineUsers(new Set(Object.keys(members.members)));
-      });
-
-      channel.bind('pusher:member_added', (member) => {
-        setOnlineUsers((prev) => new Set(prev).add(member.id));
-      });
-
-      channel.bind('pusher:member_removed', (member) => {
-        setOnlineUsers((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(member.id);
-          return newSet;
-        });
-      });
-
-      return () => {
-        pusher.unsubscribe(`presence-chat-${chatId}`);
-      };
-    }
-  }, [chatId, setOnlineUsers]);
 
   const addEmoji = (emoji) => {
     setNewMessage(prevMessage => prevMessage + emoji);
@@ -222,17 +203,30 @@ const Chat = ({
 
   const calculateNearestLocation = async () => {
     try {
+      const userLocations = selectedUsers
+        .filter(user => user.location && user.location.latitude && user.location.longitude)
+        .map(user => ({
+          userId: user.id,
+          location: user.location
+        }));
+
+      if (userLocations.length === 0) {
+        throw new Error('No valid user locations available');
+      }
+
       const response = await fetch('/api/chat/nearest-location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chatId: chatId,
-          currentUserId: session.user.id
+          currentUserId: session.user.id,
+          userLocations: userLocations
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to calculate nearest location');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to calculate nearest location');
       }
 
       const data = await response.json();
@@ -241,7 +235,7 @@ const Chat = ({
       toast.success('Nearest location calculated successfully.');
     } catch (error) {
       console.error('Error calculating nearest location:', error);
-      toast.error('Failed to calculate nearest location. Please try again.');
+      toast.error(error.message || 'Failed to calculate nearest location. Please try again.');
     }
   };
 
@@ -286,13 +280,13 @@ const Chat = ({
   };
 
   const removeUserFromChat = async (userId) => {
-    if (userId === session.user.id) {
+    if (userId === session?.user?.id) {
       toast.error("You cannot remove yourself from the chat.");
       return;
     }
     const updatedUsers = selectedUsers.filter(user => user.id !== userId);
-    await findOrCreateChatSession(updatedUsers.map(user => user.id));
     onUpdateSelectedUsers(updatedUsers);
+    await findOrCreateChatSession(updatedUsers.map(user => user.id));
   };
 
   const fetchMessages = useCallback(async (chatId, page = 1) => {
@@ -323,42 +317,6 @@ const Chat = ({
       setPage(prevPage => prevPage + 1);
       fetchMessages(chatId, page + 1);
     }
-  };
-
-  const initializePusher = (chatId) => {
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-      authEndpoint: '/api/pusher/auth',
-    });
-
-    const channel = pusher.subscribe(`chat-${chatId}`);
-    channel.bind('new-message', (data) => {
-      setMessages((prevMessages) => {
-        const messageExists = prevMessages.some(msg => msg.id === data.id);
-        if (!messageExists) {
-          if (!isTabActive) {
-            playNotificationSound();
-            showNotification(data.sender, data.text);
-            onUnreadMessagesChange(prev => prev + 1);
-          }
-          return [...prevMessages, data];
-        }
-        return prevMessages;
-      });
-    });
-
-    channel.bind('typing', (data) => {
-      if (data.sender !== session.user.name) { // Exclude current user
-        setTypingUsers((prev) => new Set(prev).add(data.sender));
-        setTimeout(() => {
-          setTypingUsers((prev) => {
-            const updated = new Set(prev);
-            updated.delete(data.sender);
-            return updated;
-          });
-        }, 2000); // Remove typing indicator after 2 seconds
-      }
-    });
   };
 
   const sendMessage = async (messageText = newMessage, messageType = 'text', additionalData = null) => {
@@ -492,12 +450,6 @@ const Chat = ({
     </div>
   );
 
-  const resetChat = () => {
-    setMessages([]);
-    setNewMessage('');
-    // Any other reset actions you need
-  };
-
   const handleScroll = useCallback((e) => {
     const { scrollTop } = e.target;
     if (scrollTop === 0 && hasMore && !loadingMessages) {
@@ -539,6 +491,14 @@ const Chat = ({
     });
   };
 
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (status === 'unauthenticated') {
+    return <div>Please log in to access the chat.</div>;
+  }
+
   if (!selectedUsers) {
     return null; // or return a loading indicator
   }
@@ -560,25 +520,17 @@ const Chat = ({
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 overflow-hidden relative">
       <div className="bg-blue-500 text-white p-3">
         <div className="flex justify-between items-center mb-2">
-          {(isMobile || showBackButton) && (
+          {/* {(isMobile || showBackButton) && (
             <button
               onClick={handleClose}
               className="text-white hover:text-gray-200 focus:outline-none"
             >
               <FontAwesomeIcon icon={faArrowLeft} />
             </button>
-          )}
+          )} */}
           <h2 className="text-lg font-semibold">
             {selectedUsers.length > 2 ? 'Group Chat' : 'Chat'}
           </h2>
-          {!isMobile && (
-            <button
-              onClick={handleClose}
-              className="text-white hover:text-gray-200 focus:outline-none"
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          )}
         </div>
         <SelectedUsersList users={selectedUsers} onRemove={removeUserFromChat} />
       </div>

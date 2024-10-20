@@ -10,7 +10,7 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation }) => {
     onClose();
   };
 
-  const availableProviders = ['Zomato', 'Swiggy', 'Zepto', 'UberEats']; // Example food providers
+  const availableProviders = ['Zomato', 'Swiggy', 'Zepto',]; // Example food providers
 
   const handleProviderChange = (provider) => {
     setFoodProviders((prev) => 
