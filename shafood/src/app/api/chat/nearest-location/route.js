@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '../../../lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../auth/[...nextauth]/route";
 
 // Helper function to calculate distance between two points
 function distance(lat1, lon1, lat2, lon2) {
@@ -48,48 +48,35 @@ function geometricMedian(points, maxIterations = 100, tolerance = 1e-6) {
 
 export async function POST(request) {
   try {
-    const { chatId, currentUserId } = await request.json();
-
-    if (!chatId || !currentUserId) {
-      return NextResponse.json({ error: 'Missing required fields: chatId or currentUserId' }, { status: 400 });
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
-    const chatCollection = db.collection('chats');
-    const userCollection = db.collection('users');
+    const { chatId, currentUserId, userLocations } = await request.json();
 
-    const chat = await chatCollection.findOne({ _id: new ObjectId(chatId) });
-    if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+    if (!chatId || !currentUserId || !userLocations || userLocations.length === 0) {
+      return NextResponse.json({ error: "Missing required data" }, { status: 400 });
     }
 
-    // Get unique senders from chat messages
-    const uniqueSenders = [...new Set(chat.messages.map(msg => msg.sender))];
+    // Filter out any invalid locations
+    const validLocations = userLocations.filter(user => 
+      user.location && typeof user.location.latitude === 'number' && typeof user.location.longitude === 'number'
+    );
 
-    if (uniqueSenders.length < 2) {
-      return NextResponse.json({ error: 'Not enough participants in the chat' }, { status: 400 });
+    if (validLocations.length === 0) {
+      return NextResponse.json({ error: "No valid user locations provided" }, { status: 400 });
     }
 
-    // Fetch user documents for all unique senders
-    const users = await userCollection.find({ name: { $in: uniqueSenders } }).toArray();
+    // Calculate the nearest location (midpoint) based on valid user locations
+    const totalLat = validLocations.reduce((sum, user) => sum + user.location.latitude, 0);
+    const totalLon = validLocations.reduce((sum, user) => sum + user.location.longitude, 0);
+    const avgLat = totalLat / validLocations.length;
+    const avgLon = totalLon / validLocations.length;
 
-    const locations = users
-      .filter(user => user && user.location && user.location.latitude && user.location.longitude)
-      .map(user => ({
-        latitude: user.location.latitude,
-        longitude: user.location.longitude
-      }));
-
-    if (locations.length < 2) {
-      return NextResponse.json({ error: 'Not enough location data. At least 2 users must have location data.' }, { status: 400 });
-    }
-
-    const optimalLocation = geometricMedian(locations);
-
-    return NextResponse.json(optimalLocation, { status: 200 });
+    return NextResponse.json({ latitude: avgLat, longitude: avgLon });
   } catch (error) {
-    console.error('Error calculating optimal meeting point:', error);
-    return NextResponse.json({ error: 'Internal server error: ' + error.message }, { status: 500 });
+    console.error('Error calculating nearest location:', error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
