@@ -136,6 +136,14 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
 
 
+      if (session?.user?.id === user.id) {
+
+        return prevSelectedUsers;
+
+      }
+
+
+
       if (isAlreadySelected) {
 
         return prevSelectedUsers.filter(
@@ -152,7 +160,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
     });
 
-  }, []);
+  }, [session]);
 
 
 
@@ -160,7 +168,9 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
     if (selectedUsers.length > 0) {
 
-      router.push(`/chat?users=${encodeURIComponent(JSON.stringify(selectedUsers))}`);
+      const filteredUsers = selectedUsers.filter(user => user.id !== session?.user?.id);
+
+      router.push(`/chat?users=${encodeURIComponent(JSON.stringify(filteredUsers))}`);
 
     } else {
 
@@ -168,7 +178,7 @@ const LocationTracker = ({ preferences, onUpdate }) => {
 
     }
 
-  }, [selectedUsers, router]);
+  }, [selectedUsers, router, session]);
 
 
 
