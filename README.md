@@ -31,7 +31,7 @@ This project is licensed under the Shafood Restricted Contribution License - see
 
 ## 📞 Contact
 
-For any queries or support, please contact us at [support@shafood.com](mailto:support@shafood.com).
+For any queries or support, please contact us at [support@shafood.com](mailto:support@shafood.online).
 
 ---
 
