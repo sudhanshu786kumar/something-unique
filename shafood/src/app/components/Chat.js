@@ -46,6 +46,42 @@ const Chat = ({
   const [showBackButton, setShowBackButton] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
 
+  const ensureUserLocations = async () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser.");
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            // Update current user's location
+            await fetch('/api/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: session.user.id,
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              }),
+            });
+            resolve(true);
+          } catch (error) {
+            console.error('Error updating location:', error);
+            toast.error('Failed to update your location. Please try again.');
+            resolve(false);
+          }
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          toast.error('Unable to get your location. Please check your browser settings.');
+          resolve(false);
+        }
+      );
+    });
+  };
+
   const findOrCreateChatSession = useCallback(async (userIds) => {
     if (!session || !session.user) {
       console.error("Session or user is not available");
@@ -203,15 +239,36 @@ const Chat = ({
 
   const calculateNearestLocation = async () => {
     try {
-      const userLocations = selectedUsers
+      // First ensure current user's location is up to date
+      const locationShared = await ensureUserLocations();
+      if (!locationShared) {
+        return;
+      }
+
+      // Show loading toast
+      const loadingToast = toast.loading('Calculating nearest location...');
+
+      // Rest of the existing calculateNearestLocation function...
+      const userIds = selectedUsers.map(user => user.id);
+      const locationsResponse = await fetch(`/api/users/locations?userIds=${userIds.join(',')}`);
+      
+      if (!locationsResponse.ok) {
+        throw new Error('Failed to fetch user locations');
+      }
+      
+      const userLocationsData = await locationsResponse.json();
+      
+      // Map the locations to the format expected by the nearest-location API
+      const userLocations = userLocationsData
         .filter(user => user.location && user.location.latitude && user.location.longitude)
         .map(user => ({
           userId: user.id,
           location: user.location
         }));
 
-      if (userLocations.length === 0) {
-        throw new Error('No valid user locations available');
+      if (userLocations.length < 2) {
+        toast.error('At least two users with valid locations are required. Make sure users have shared their locations.');
+        return;
       }
 
       const response = await fetch('/api/chat/nearest-location', {
@@ -230,9 +287,18 @@ const Chat = ({
       }
 
       const data = await response.json();
-      const nearestLocationMessage = `Nearest location: https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
-      sendMessage(nearestLocationMessage, 'location', { latitude: data.latitude, longitude: data.longitude });
-      toast.success('Nearest location calculated successfully.');
+      const nearestLocationMessage = `📍 Optimal meeting point found!\nLocation: https://www.google.com/maps?q=${data.latitude},${data.longitude}\nAverage distance: ${data.averageDistance.toFixed(2)} km\nMax distance: ${data.maxDistance.toFixed(2)} km`;
+      
+      sendMessage(nearestLocationMessage, 'location', { 
+        latitude: data.latitude, 
+        longitude: data.longitude,
+        averageDistance: data.averageDistance,
+        maxDistance: data.maxDistance
+      });
+      
+      // Update loading toast on success
+      toast.dismiss(loadingToast);
+      toast.success('Nearest location calculated successfully!');
     } catch (error) {
       console.error('Error calculating nearest location:', error);
       toast.error(error.message || 'Failed to calculate nearest location. Please try again.');
@@ -411,6 +477,12 @@ const Chat = ({
                 src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${msg.additionalData.latitude},${msg.additionalData.longitude}`}
                 allowFullScreen
               ></iframe>
+              {msg.additionalData.averageDistance && (
+                <div className="mt-2 text-sm text-gray-600">
+                  <p>Average distance: {msg.additionalData.averageDistance.toFixed(2)} km</p>
+                  <p>Max distance: {msg.additionalData.maxDistance.toFixed(2)} km</p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -437,6 +509,13 @@ const Chat = ({
       {users.map(user => (
         <div key={user.id} className="bg-blue-600 rounded-full px-3 py-1 text-sm mr-2 mb-2 flex items-center">
           <span>{user.name}</span>
+          {user.location && (
+            <FontAwesomeIcon 
+              icon={faMapMarkerAlt} 
+              className="ml-1 text-xs text-green-300" 
+              title="Location shared"
+            />
+          )}
           {user.id !== session.user.id && (
             <button
               onClick={() => onRemove(user.id)}
