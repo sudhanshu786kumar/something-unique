@@ -86,17 +86,23 @@ export const findOrCreateChatSession = async (userIds, creatorId) => {
     const db = client.db();
     const chatCollection = db.collection('chats');
 
-    // Find a chat that includes all the user IDs
+    // Ensure creatorId is included in userIds if not already present
+    const uniqueUserIds = Array.from(new Set([...userIds, creatorId]));
+
+    // Find a chat that includes exactly these users (no more, no less)
     const chat = await chatCollection.findOne({
-        users: { $all: userIds }
+        $and: [
+            { users: { $all: uniqueUserIds } },
+            { users: { $size: uniqueUserIds.length } }
+        ]
     });
 
     if (chat) {
         return chat._id; // Return existing chat ID
     } else {
-        // Create a new chat session if none exists
+        // Create a new chat session
         const newChat = {
-            users: userIds,
+            users: uniqueUserIds,
             messages: [],
             createdAt: new Date(),
             orderStatus: 'pending',
@@ -107,6 +113,6 @@ export const findOrCreateChatSession = async (userIds, creatorId) => {
             creatorId: creatorId
         };
         const result = await chatCollection.insertOne(newChat);
-        return result.insertedId; // Return new chat ID
+        return result.insertedId;
     }
 };
