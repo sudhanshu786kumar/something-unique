@@ -228,7 +228,7 @@ const NoUsersFound = ({ preferences }) => (
         No Nearby Users Found
       </h3>
       <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-        We couldn't find any users within {preferences.locationRange}km who match your preferences.
+        We couldn&apos;t find any users within {preferences.locationRange}km who match your preferences.
       </p>
       <div className="pt-4 space-y-2">
         <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
