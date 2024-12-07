@@ -46,75 +46,150 @@ const Chat = ({
   const [showBackButton, setShowBackButton] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
 
-  const ensureUserLocations = async () => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser.");
-      return false;
-    }
+  const [loading, setLoading] = useState(false);
 
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            // Update current user's location
-            await fetch('/api/location', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: session.user.id,
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude
-              }),
-            });
-            resolve(true);
-          } catch (error) {
-            console.error('Error updating location:', error);
-            toast.error('Failed to update your location. Please try again.');
-            resolve(false);
-          }
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          toast.error('Unable to get your location. Please check your browser settings.');
-          resolve(false);
+  // Add a ref to track if initial fetch is done
+  const initialFetchDoneRef = useRef(false);
+
+  const fetchMessages = useCallback(async (chatId, page = 1, force = false) => {
+    // Prevent duplicate fetches
+    if (!force && initialFetchDoneRef.current && page === 1) return;
+    if (loadingMessages) return;
+
+    setLoadingMessages(true);
+    try {
+      const response = await fetch(`/api/chat/${chatId}/messages?page=${page}&limit=20`);
+      if (response.ok) {
+        const data = await response.json();
+        if (page === 1) {
+          setMessages(data.messages);
+          initialFetchDoneRef.current = true;
+        } else {
+          setMessages(prevMessages => [...prevMessages, ...data.messages]);
         }
-      );
+        setHasMore(data.hasMore);
+      } else {
+        throw new Error('Failed to fetch messages');
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      toast.error('Failed to load messages. Please try again.');
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [loadingMessages]);
+
+  // Initialize chat and fetch messages
+  useEffect(() => {
+    if (chatId && !initialFetchDoneRef.current) {
+      fetchMessages(chatId, 1, true);
+    }
+  }, [chatId, fetchMessages]);
+
+  // Handle real-time updates with Pusher
+  useEffect(() => {
+    if (!session?.user?.id || !chatId) return;
+
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: '/api/pusher/auth',
     });
-  };
+
+    const chatChannel = pusher.subscribe(`chat-${chatId}`);
+    
+    chatChannel.bind('new-message', (data) => {
+      setMessages(prevMessages => {
+        const messageExists = prevMessages.some(msg => msg.id === data.id);
+        if (!messageExists) {
+          const updatedMessages = [...prevMessages, data].sort((a, b) => 
+            new Date(a.createdAt) - new Date(b.createdAt)
+          );
+          
+          // Scroll to bottom for new messages
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+
+          return updatedMessages;
+        }
+        return prevMessages;
+      });
+    });
+
+    // Handle typing indicators
+    chatChannel.bind('typing', (data) => {
+      if (data.sender !== session.user.name) {
+        setTypingUsers(prev => new Set(prev).add(data.sender));
+        setTimeout(() => {
+          setTypingUsers(prev => {
+            const updated = new Set(prev);
+            updated.delete(data.sender);
+            return updated;
+          });
+        }, 2000);
+      }
+    });
+
+    return () => {
+      chatChannel.unbind_all();
+      pusher.unsubscribe(`chat-${chatId}`);
+      pusher.disconnect();
+    };
+  }, [chatId, session?.user?.id, session?.user?.name]);
+
+  // Load more messages when scrolling up
+  const handleScroll = useCallback((e) => {
+    const { scrollTop } = e.target;
+    if (scrollTop === 0 && hasMore && !loadingMessages) {
+      const nextPage = Math.ceil(messages.length / 20) + 1;
+      fetchMessages(chatId, nextPage);
+    }
+  }, [hasMore, loadingMessages, messages.length, chatId, fetchMessages]);
 
   const findOrCreateChatSession = useCallback(async (userIds) => {
-    if (!session || !session.user) {
+    if (!session?.user || loading) {
       console.error("Session or user is not available");
       return;
     }
 
     try {
+      setLoading(true);
       const response = await fetch('/api/chat/find-or-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds }),
+        body: JSON.stringify({ userIds, chatId: initialChatId }),
       });
 
       if (response.ok) {
-        const { chatId } = await response.json();
-        setChatId(chatId);
-        onChatIdChange(chatId);
-        fetchMessages(chatId);
+        const data = await response.json();
+        setChatId(data.chatId);
+        onChatIdChange?.(data.chatId);
+        fetchMessages(data.chatId);
       } else {
         throw new Error("Failed to create or update chat session");
       }
     } catch (error) {
       console.error("Error in findOrCreateChatSession:", error);
       toast.error("Failed to update chat session. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [session, onChatIdChange]);
+  }, [session?.user, loading, fetchMessages, initialChatId]);
 
   useEffect(() => {
-    if (selectedUsers && selectedUsers.length > 0) {
+    if (selectedUsers?.length > 0 && session?.user) {
+      // Reset chat state when users change
+      setChatId(null);
+      setMessages([]);
+      setNewMessage('');
+      setPage(1);
+      setHasMore(true);
+      
+      // Create new chat session with selected users
       const userIds = selectedUsers.map(user => user.id);
       findOrCreateChatSession(userIds);
     }
-  }, [selectedUsers, findOrCreateChatSession]);
+  }, [selectedUsers, session?.user]); // Depend on selectedUsers to update chat
 
   useEffect(() => {
     const handleResize = () => {
@@ -355,29 +430,6 @@ const Chat = ({
     await findOrCreateChatSession(updatedUsers.map(user => user.id));
   };
 
-  const fetchMessages = useCallback(async (chatId, page = 1) => {
-    setLoadingMessages(true);
-    try {
-      const response = await fetch(`/api/chat/${chatId}/messages?page=${page}&limit=20`);
-      if (response.ok) {
-        const data = await response.json();
-        if (page === 1) {
-          setMessages(data.messages);
-        } else {
-          setMessages(prevMessages => [...prevMessages, ...data.messages]);
-        }
-        setHasMore(data.hasMore);
-      } else {
-        throw new Error('Failed to fetch messages');
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Failed to load messages. Please try again.');
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, []);
-
   const loadMoreMessages = () => {
     if (hasMore && !loadingMessages) {
       setPage(prevPage => prevPage + 1);
@@ -529,13 +581,6 @@ const Chat = ({
     </div>
   );
 
-  const handleScroll = useCallback((e) => {
-    const { scrollTop } = e.target;
-    if (scrollTop === 0 && hasMore && !loadingMessages) {
-      loadMoreMessages();
-    }
-  }, [hasMore, loadingMessages, loadMoreMessages]);
-
   const handleClose = () => {
     if (typeof onClose === 'function') {
       onClose();
@@ -569,6 +614,30 @@ const Chat = ({
       onClick: () => router.push('/chat')
     });
   };
+
+  // Add URL parameter tracking
+  useEffect(() => {
+    // Get chatId from URL if available
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlChatId = urlParams.get('chatId');
+    
+    if (urlChatId) {
+      setChatId(urlChatId);
+      onChatIdChange?.(urlChatId);
+      fetchMessages(urlChatId);
+    } else if (selectedUsers?.length > 0 && session?.user) {
+      // Reset chat state when users change
+      setChatId(null);
+      setMessages([]);
+      setNewMessage('');
+      setPage(1);
+      setHasMore(true);
+      
+      // Create new chat session with selected users
+      const userIds = selectedUsers.map(user => user.id);
+      findOrCreateChatSession(userIds);
+    }
+  }, [selectedUsers, session?.user, location.search]); // Add location.search to dependencies
 
   if (status === 'loading') {
     return <div>Loading...</div>;
