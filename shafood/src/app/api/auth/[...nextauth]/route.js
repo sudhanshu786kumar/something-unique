@@ -63,28 +63,43 @@ export const authOptions = {
       return true;
     },
     async jwt({ token, user }) {
+      // Always include user ID in the token
       if (user) {
         token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
+      // Always include user ID in the session
       if (session?.user) {
         session.user.id = token.id;
+        // Fetch latest user data
         const dbUser = await getUserByEmail(session.user.email);
-        session.user.online = dbUser.online;
+        if (dbUser) {
+          session.user.id = dbUser._id.toString(); // Ensure ID is set from DB
+          session.user.online = dbUser.online;
+          session.user.name = dbUser.name;
+          session.user.image = dbUser.image;
+        }
       }
       return session;
     },
   },
   events: {
     async signOut({ token }) {
-      await updateUser(new ObjectId(token.id), { online: false });
+      if (token?.id) {
+        await updateUser(new ObjectId(token.id), { online: false });
+      }
     },
   },
   pages: {
     signIn: '/login',
   },
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
+  }
 };
 
 initDatabase().catch(console.error);

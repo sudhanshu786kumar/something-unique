@@ -38,6 +38,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 
 
+import ChatNotificationIcon from './ChatNotificationIcon';
+
+
+
+import { ToastContainer } from 'react-toastify';
+
+import 'react-toastify/dist/ReactToastify.css';
+
+
+
 
 
 
@@ -246,6 +256,90 @@ const Layout = ({ children, walletBalance = 0 }) => {
 
 
 
+      <ToastContainer
+
+
+
+        position="bottom-right"
+
+
+
+        autoClose={7000}
+
+
+
+        hideProgressBar
+
+
+
+        newestOnTop={false}
+
+
+
+        closeOnClick={false}
+
+
+
+        rtl={false}
+
+
+
+        pauseOnFocusLoss
+
+
+
+        draggable
+
+
+
+        pauseOnHover
+
+
+
+        theme="light"
+
+
+
+        style={{
+
+
+
+          zIndex: 9999,
+
+
+
+        }}
+
+
+
+        toastStyle={{
+
+
+
+          backgroundColor: 'transparent',
+
+
+
+          boxShadow: 'none',
+
+
+
+          padding: 0,
+
+
+
+          minHeight: 'auto'
+
+
+
+        }}
+
+
+
+      />
+
+
+
       <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50">
 
 
@@ -438,7 +532,11 @@ const Layout = ({ children, walletBalance = 0 }) => {
 
 
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+
+
+
+            <ChatNotificationIcon />
 
 
 
