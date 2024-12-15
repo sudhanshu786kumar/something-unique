@@ -616,7 +616,9 @@ const Dashboard = () => {
                 No nearby users found matching your preferences
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-500">
-                Try adjusting your preferences or search radius
+                {!selectedUsers.length ? "Try adjusting your preferences" : 
+                 selectedUsers.length === 1 ? "Ready to start chat" :
+                 `Ready to start group chat`}
               </p>
             </div>
           )}
