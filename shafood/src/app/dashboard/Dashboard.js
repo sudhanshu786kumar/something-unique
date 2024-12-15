@@ -42,6 +42,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (location) {
+    
       const updateLocationData = async () => {
         try {
           // Get address from coordinates using Google Geocoding
@@ -390,7 +391,7 @@ const Dashboard = () => {
                       <span className="text-gray-600 dark:text-gray-400">kilometers</span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      We'll find ordering partners within this distance from your location
+                      We&apos;ll find ordering partners within this distance from your location
                     </p>
                   </div>
 
@@ -406,7 +407,7 @@ const Dashboard = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      You'll be matched with users planning to order within this price range
+                      You&apos;ll be matched with users planning to order within this price range
                     </p>
                   </div>
                 </div>
