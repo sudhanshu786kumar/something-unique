@@ -30,10 +30,6 @@ const Dashboard = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    libraries: ['places'],
-  });
   const [showChat, setShowChat] = useState(false);
   const [activeChatId, setActiveChatId] = useState(null);
   const [userLocations, setUserLocations] = useState({});
@@ -45,22 +41,20 @@ const Dashboard = () => {
     
       const updateLocationData = async () => {
         try {
-          // Get address from coordinates using Google Geocoding
+          // Use OpenStreetMap's Nominatim API instead of Google Geocoding
           const response = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${location.latitude},${location.longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}`
           );
           
           if (response.ok) {
             const data = await response.json();
-            if (data.results && data.results[0]) {
-              const formattedLocation = {
-                ...location,
-                address: data.results[0].formatted_address
-              };
-              
-              setCurrentLocation(formattedLocation);
-              localStorage.setItem('userLocation', JSON.stringify(formattedLocation));
-            }
+            const formattedLocation = {
+              ...location,
+              address: data.display_name
+            };
+            
+            setCurrentLocation(formattedLocation);
+            localStorage.setItem('userLocation', JSON.stringify(formattedLocation));
           }
         } catch (error) {
           console.error('Error getting address:', error);
@@ -191,60 +185,83 @@ const Dashboard = () => {
   };
 
   const LocationSearchBox = () => {
-    const {
-      ready,
-      value,
-      suggestions: { status, data },
-      setValue,
-      clearSuggestions,
-    } = usePlacesAutocomplete();
+    const [address, setAddress] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [loading, setLoading] = useState(false);
 
-    const handleSelect = async (address) => {
+    const searchLocations = async (query) => {
+      if (!query.trim() || query.length < 3) {
+        setSuggestions([]);
+        return;
+      }
+
+      setLoading(true);
       try {
-        const results = await getGeocode({ address });
-        const { lat, lng } = await getLatLng(results[0]);
-        const newLocation = {
-          address,
-          latitude: lat,
-          longitude: lng
-        };
-        setCurrentLocation(newLocation);
-        localStorage.setItem('userLocation', JSON.stringify(newLocation));
-        setShowLocationSearch(false);
-        toast.success('Location updated successfully!');
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestions(data);
+        }
       } catch (error) {
-        console.error('Error:', error);
-        toast.error('Error updating location');
+        console.error('Error searching locations:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
+    const handleSelect = async (location) => {
+      const newLocation = {
+        address: location.display_name,
+        latitude: parseFloat(location.lat),
+        longitude: parseFloat(location.lon)
+      };
+      
+      setCurrentLocation(newLocation);
+      localStorage.setItem('userLocation', JSON.stringify(newLocation));
+      setShowLocationSearch(false);
+      setSuggestions([]);
+      toast.success('Location updated successfully!');
+    };
+
     return (
-      <Combobox value={value} onChange={handleSelect}>
-        <div className="relative mt-2">
-          <Combobox.Input
-            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+      <div className="mt-2">
+        <div className="relative">
+          <input
+            type="text"
+            value={address}
+            onChange={(e) => {
+              setAddress(e.target.value);
+              searchLocations(e.target.value);
+            }}
             placeholder="Search for a location..."
-            onChange={(e) => setValue(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all dark:bg-gray-800 dark:border-gray-700 dark:text-white"
           />
-          <Combobox.Options className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-lg overflow-auto">
-            {status === "OK" &&
-              data.map(({ place_id, description }) => (
-                <Combobox.Option key={place_id} value={description}>
-                  {({ active }) => (
-                    <div className={`p-2 cursor-pointer ${
-                      active ? 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-orange-100' : 'text-gray-900 dark:text-gray-100'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
-                        <span>{description}</span>
-                      </div>
-                    </div>
-                  )}
-                </Combobox.Option>
-              ))}
-          </Combobox.Options>
+          <FontAwesomeIcon 
+            icon={loading ? faSpinner : faMapMarkerAlt}
+            className={`absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-500 ${loading ? 'animate-spin' : ''}`}
+          />
         </div>
-      </Combobox>
+
+        {suggestions.length > 0 && (
+          <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-lg overflow-auto">
+            {suggestions.map((suggestion) => (
+              <div
+                key={suggestion.place_id}
+                onClick={() => handleSelect(suggestion)}
+                className="p-2 hover:bg-orange-50 dark:hover:bg-gray-700 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
+                  <span className="text-sm">{suggestion.display_name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -311,28 +328,27 @@ const Dashboard = () => {
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500 text-xl" />
                   <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Current Location</h2>
                 </div>
-                <button
-                  onClick={() => setShowLocationSearch(!showLocationSearch)}
-                  className="px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <FontAwesomeIcon icon={faMapMarkerAlt} />
-                  Update Location
-                </button>
+                {!showLocationSearch && (
+                  <button
+                    onClick={() => setShowLocationSearch(true)}
+                    className="px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <FontAwesomeIcon icon={faMapMarkerAlt} />
+                    Update Location
+                  </button>
+                )}
               </div>
               
-              {showLocationSearch && isLoaded ? (
-                <LocationSearchBox />
-              ) : (
-                <>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {currentLocation?.address || 'Getting address...'}
-                  </p>
-                  {!currentLocation?.address && currentLocation && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Coordinates: {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
-                    </p>
-                  )}
-                </>
+              {showLocationSearch && (
+                <div className="relative">
+                  <LocationSearchBox />
+                  <button
+                    onClick={() => setShowLocationSearch(false)}
+                    className="absolute top-0 right-0 mt-3 mr-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
               )}
             </motion.div>
 

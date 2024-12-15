@@ -4,16 +4,10 @@ import { useState, useEffect, lazy, Suspense, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBars, faTimes, faSearch, faMapMarkerAlt, faUtensils } from '@fortawesome/free-solid-svg-icons'
+import { faBars, faTimes, faSearch, faMapMarkerAlt, faUtensils, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import Loader from './Loader'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { useLoadScript } from '@react-google-maps/api';
-import { Combobox } from '@headlessui/react';
-import usePlacesAutocomplete, {
-  getGeocode,
-  getLatLng,
-} from "use-places-autocomplete";
 import { useRouter } from 'next/navigation';
 import PreferencesModal from './PreferencesModal';
 
@@ -37,6 +31,167 @@ const LocationSkeleton = () => (
   </div>
 );
 
+// Add these skeleton components at the top
+const LocationSearchSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-full w-full mb-2"></div>
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-2 p-2">
+          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const LocationSearchResult = ({ suggestion, onSelect, handleLocationSelect }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 5 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -5 }}
+    onClick={() => handleLocationSelect(suggestion)}
+    className="p-3 hover:bg-orange-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0 border-gray-100 dark:border-gray-700 transition-all duration-200"
+  >
+    <div className="flex items-center gap-3">
+      <div className="flex-shrink-0">
+        <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-800 dark:text-gray-200 truncate">
+          {suggestion.display_name}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          {suggestion.type} • {suggestion.address?.city || suggestion.address?.town}
+        </p>
+      </div>
+    </div>
+  </motion.div>
+);
+
+// Update the LocationSearchBox component to receive and update isFocused through props
+const LocationSearchBox = ({ handleLocationSelect, isFocused, setIsFocused }) => {
+  const [address, setAddress] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const searchTimeout = useRef(null);
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+
+  const searchLocations = async (query) => {
+    if (!query.trim() || query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `format=json&` +
+        `q=${encodeURIComponent(query)}&` +
+        `limit=5&` +
+        `addressdetails=1&` +
+        `countrycodes=in`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestions(data);
+      }
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      toast.error('Failed to search locations. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const debouncedSearch = (query) => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      searchLocations(query);
+    }, 300);
+  };
+
+  useEffect(() => {
+    if (isFocused && address.length > 0) {
+      setShowLocationSearch(true);
+    } else {
+      setShowLocationSearch(false);
+    }
+  }, [isFocused, address]);
+
+  return (
+    <div className="relative w-full max-w-md mx-auto">
+      <div className="relative">
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => {
+            setAddress(e.target.value);
+            debouncedSearch(e.target.value);
+          }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+          placeholder="Search your location..."
+          className="w-full pl-12 pr-4 py-4 rounded-full border-2 border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all dark:bg-gray-800 dark:border-orange-700 dark:text-white shadow-sm hover:shadow-md"
+        />
+        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+          {loading ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              <FontAwesomeIcon icon={faSpinner} className="text-orange-500 text-xl" />
+            </motion.div>
+          ) : (
+            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500 text-xl" />
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {(isFocused && address.length > 0) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+          >
+            {loading ? (
+              <LocationSearchSkeleton />
+            ) : suggestions.length > 0 ? (
+              <div className="max-h-[300px] overflow-y-auto suggestions-container">
+                {suggestions.map((suggestion) => (
+                  <LocationSearchResult
+                    key={suggestion.place_id}
+                    suggestion={suggestion}
+                    handleLocationSelect={handleLocationSelect}
+                  />
+                ))}
+              </div>
+            ) : address.length >= 3 ? (
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                No locations found
+              </div>
+            ) : (
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                Type at least 3 characters to search
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default function HomeClient({ steps }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true)
@@ -50,11 +205,50 @@ export default function HomeClient({ steps }) {
     locationRange: 7
   });
 
-  // Add Google Maps script loader
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    libraries: ["places"],
-  });
+  const [address, setAddress] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  const searchLocations = async (query) => {
+    if (!query.trim() || query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestions(data);
+      }
+    } catch (error) {
+      console.error('Error searching locations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLocationSelect = async (location) => {
+    try {
+      const newLocation = {
+        address: location.display_name,
+        latitude: parseFloat(location.lat),
+        longitude: parseFloat(location.lon)
+      };
+      
+      localStorage.setItem('userLocation', JSON.stringify(newLocation));
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error setting location:', error);
+      toast.error('Failed to set location. Please try again.');
+    }
+  };
 
   useEffect(() => {
     // Try to get saved location from localStorage
@@ -63,172 +257,6 @@ export default function HomeClient({ steps }) {
       setSelectedLocation(JSON.parse(savedLocation));
     }
   }, []);
-
-  // Location search component
-  const LocationSearchBox = () => {
-    const inputRef = useRef(null);
-    const [inputValue, setInputValue] = useState('');
-    const [suggestions, setSuggestions] = useState([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [shouldShowSuggestions, setShouldShowSuggestions] = useState(false);
-    const typingTimeoutRef = useRef(null);
-    
-    const {
-      ready,
-      suggestions: { status, data },
-      setValue: setPlacesValue,
-      clearSuggestions,
-    } = usePlacesAutocomplete({
-      requestOptions: {
-        componentRestrictions: { country: 'IN' },
-      },
-      debounce: 300,
-      cacheKey: 'location-search',
-    });
-
-    // Update suggestions when API returns data
-    useEffect(() => {
-      if (status === "OK" && data.length > 0) {
-        setSuggestions(data.slice(0, 5));
-        setIsSearching(false);
-        setShouldShowSuggestions(true);
-      }
-    }, [status, data]);
-
-    const handleInputChange = (e) => {
-      const value = e.target.value;
-      setInputValue(value);
-      setShouldShowSuggestions(true);
-
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      if (value.length > 3) {
-        setIsSearching(true);
-        typingTimeoutRef.current = setTimeout(() => {
-          setPlacesValue(value);
-        }, 1000);
-      } else {
-        setIsSearching(false);
-        clearSuggestions();
-        setSuggestions([]);
-      }
-    };
-
-    const handleSelect = async (address) => {
-      try {
-        setInputValue(address);
-        clearSuggestions();
-        setSuggestions([]);
-        setShouldShowSuggestions(false);
-
-        const results = await getGeocode({ address });
-        const { lat, lng } = await getLatLng(results[0]);
-        const newLocation = {
-          address,
-          latitude: lat,
-          longitude: lng
-        };
-        setSelectedLocation(newLocation);
-        localStorage.setItem('userLocation', JSON.stringify(newLocation));
-        
-        toast.success("Location set successfully!", {
-          position: "top-center",
-          autoClose: 2000,
-        });
-      } catch (error) {
-        console.error("Geocoding error:", error);
-        toast.error("Error setting location");
-        setShouldShowSuggestions(true);
-      }
-    };
-
-    // Handle click outside to close suggestions
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.location-search-container')) {
-        setShouldShowSuggestions(false);
-      }
-    };
-
-    useEffect(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, []);
-
-    return (
-      <div className="relative location-search-container">
-        <FontAwesomeIcon 
-          icon={faMapMarkerAlt} 
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500 z-10"
-        />
-        <Combobox
-          value={inputValue}
-          onChange={handleSelect}
-          as="div"
-        >
-          <div className="relative">
-            <Combobox.Input
-              ref={inputRef}
-              className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              placeholder="Enter your location (minimum 4 characters)"
-              disabled={!ready}
-              displayValue={(val) => val}
-              onChange={handleInputChange}
-              onFocus={() => setShouldShowSuggestions(true)}
-              autoComplete="off"
-            />
-            <Combobox.Options 
-              className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-lg overflow-auto"
-              static
-            >
-              {shouldShowSuggestions && (
-                <>
-                  {inputValue.length <= 3 ? (
-                    <div className="p-2 text-gray-500 dark:text-gray-400">
-                      Please enter at least 4 characters...
-                    </div>
-                  ) : isSearching ? (
-                    <div className="p-2 text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                      <div className="animate-spin">
-                        <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
-                      </div>
-                      <span>Searching locations...</span>
-                    </div>
-                  ) : suggestions.length > 0 ? (
-                    suggestions.map(({ place_id, description }) => (
-                      <Combobox.Option
-                        key={place_id}
-                        value={description}
-                        className={({ active }) =>
-                          `p-2 cursor-pointer ${
-                            active
-                              ? 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-orange-100'
-                              : 'text-gray-900 dark:text-gray-100'
-                          }`
-                        }
-                      >
-                        <div className="flex items-center gap-2">
-                          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
-                          <span>{description}</span>
-                        </div>
-                      </Combobox.Option>
-                    ))
-                  ) : (
-                    <div className="p-2 text-gray-500 dark:text-gray-400">
-                      No results found
-                    </div>
-                  )}
-                </>
-              )}
-            </Combobox.Options>
-          </div>
-        </Combobox>
-      </div>
-    );
-  };
 
   const handlePreferencesUpdate = (newPreferences) => {
     setPreferences(newPreferences);
@@ -323,22 +351,11 @@ export default function HomeClient({ steps }) {
             >
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
-                  {isLoaded ? (
-                    <LocationSearchBox />
-                  ) : (
-                    <div className="relative">
-                      <FontAwesomeIcon 
-                        icon={faMapMarkerAlt} 
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Loading location search..."
-                        disabled
-                        className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 bg-gray-50 cursor-not-allowed"
-                      />
-                    </div>
-                  )}
+                  <LocationSearchBox 
+                    handleLocationSelect={handleLocationSelect}
+                    isFocused={isFocused}
+                    setIsFocused={setIsFocused}
+                  />
                 </div>
                 <div className="flex-1">
                   <button
@@ -367,7 +384,7 @@ export default function HomeClient({ steps }) {
               />
             </motion.div>
 
-            {!showPreferencesModal && (
+            {!showPreferencesModal && !isFocused && (
               <motion.div 
                 className="flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-6 relative z-[1]"
                 initial={{ opacity: 0, y: 50 }}

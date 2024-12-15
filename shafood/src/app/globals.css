@@ -29,3 +29,31 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* Location search styling */
+.location-search-result {
+  @apply transition-all duration-200;
+}
+
+.location-search-result:hover {
+  @apply bg-orange-50 dark:bg-gray-700;
+}
+
+/* Custom scrollbar for suggestions */
+.suggestions-container {
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 transparent;
+}
+
+.suggestions-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suggestions-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.suggestions-container::-webkit-scrollbar-thumb {
+  background-color: #f97316;
+  border-radius: 3px;
+}
