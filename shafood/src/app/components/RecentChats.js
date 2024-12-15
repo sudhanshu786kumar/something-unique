@@ -3,8 +3,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faUser, faShoppingBasket, faCheckCircle, faClock, faMoneyBill, faTruck } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faUser, faShoppingBasket, faCheckCircle, faClock, faMoneyBill, faTruck, faComments } from '@fortawesome/free-solid-svg-icons';
 import Pusher from 'pusher-js';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
+import { formatDistanceToNow } from 'date-fns';
 
 const OrderStatusBadge = ({ status, totalAmount }) => {
   const getStatusConfig = (status) => {
@@ -57,150 +60,95 @@ const OrderStatusBadge = ({ status, totalAmount }) => {
 const RecentChats = ({ onChatSelect }) => {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const { data: session } = useSession();
 
-  const fetchChats = useCallback(async () => {
-    if (!session?.user?.id) return;
-
-    try {
-      const response = await fetch('/api/chat/list');
-      if (response.ok) {
-        const data = await response.json();
-        // Filter chats where current user is involved
-        const filteredChats = data.filter(chat => {
-          return (
-            // Chat has messages or current user is creator
-            (chat.messages?.length > 0 || chat.creatorId === session.user.id) &&
-            // Has valid participants
-            chat.participants?.length > 0 &&
-            // Current user is involved
-            (chat.users?.includes(session.user.id) || chat.creatorId === session.user.id)
-          );
-        });
-        setChats(filteredChats);
-      }
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [session?.user?.id]);
-
-  // Initial fetch
   useEffect(() => {
-    if (session?.user?.id) {
-      fetchChats();
-    }
-  }, [session?.user?.id, fetchChats]);
-
-  // Pusher subscription for real-time updates
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-      authEndpoint: '/api/pusher/auth',
-    });
-
-    const channel = pusher.subscribe(`user-${session.user.id}`);
-    
-    channel.bind('new-message', (data) => {
-      setChats(prevChats => {
-        const chatIndex = prevChats.findIndex(chat => chat.id === data.chatId);
-        
-        if (chatIndex === -1) {
-          // If chat doesn't exist in the list, fetch all chats
-          fetchChats();
-          return prevChats;
+    const fetchRecentChats = async () => {
+      try {
+        const response = await fetch('/api/chat/recent');
+        if (response.ok) {
+          const data = await response.json();
+          setChats(data);
         }
-
-        const updatedChats = [...prevChats];
-        const updatedChat = {
-          ...updatedChats[chatIndex],
-          lastMessage: {
-            text: data.text,
-            sender: data.sender,
-            createdAt: new Date().toISOString()
-          }
-        };
-
-        // Move updated chat to top
-        updatedChats.splice(chatIndex, 1);
-        updatedChats.unshift(updatedChat);
-
-        return updatedChats;
-      });
-    });
-
-    return () => {
-      channel.unbind_all();
-      pusher.unsubscribe(`user-${session.user.id}`);
+      } catch (error) {
+        console.error('Error fetching recent chats:', error);
+        toast.error('Failed to load recent chats');
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [session?.user?.id, fetchChats]);
+
+    fetchRecentChats();
+  }, []);
+
+  const handleChatClick = async (chat) => {
+    try {
+      // Store chat users in localStorage
+      const chatUsers = chat.participants.map(participant => ({
+        id: participant.id,
+        name: participant.name,
+        preferences: participant.preferences
+      }));
+      localStorage.setItem('chatUsers', JSON.stringify(chatUsers));
+
+      // Navigate to chat page with appropriate tab based on order status
+      const tab = chat.orderStatus ? 'order' : 'chat';
+      router.push(`/chat/${chat.id}?tab=${tab}`);
+
+    } catch (error) {
+      console.error('Error navigating to chat:', error);
+      toast.error('Failed to open chat');
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-32">
+      <div className="flex justify-center items-center p-4">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         >
-          <FontAwesomeIcon icon={faSpinner} size="2x" className="text-orange-500" />
+          <FontAwesomeIcon icon={faSpinner} className="text-2xl text-orange-500" />
         </motion.div>
       </div>
     );
   }
 
-  if (chats.length === 0) {
-    return (
-      <div className="text-center text-gray-500 p-4">
-        <FontAwesomeIcon icon={faUser} className="text-4xl mb-2" />
-        <p>No recent chats found</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2">
-      {chats.map((chat) => {
-        const otherParticipants = chat.participants;
-        const chatName = otherParticipants.map(p => p.name).join(', ');
-        
-        console.log('Chat data:', chat);
+    <div className="space-y-4">
+      {chats.length > 0 ? (
+        chats.map((chat) => {
+          const otherParticipants = chat.participants.filter(
+            p => p.id !== session?.user?.id
+          );
 
-        return (
-          <motion.div
-            key={chat.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow hover:shadow-md cursor-pointer"
-            onClick={() => onChatSelect(chat)}
-          >
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm">{chatName}</h3>
-                    {chat.orderer && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        (Ordered by: {chat.orderer === session?.user?.id ? 'You' : 
-                          otherParticipants.find(p => p.id === chat.orderer)?.name || 'Unknown'})
-                      </span>
-                    )}
-                  </div>
-                  {chat.lastMessage && (
-                    <div className="flex flex-col mt-1">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                        {chat.lastMessage.sender === session?.user?.name ? 'You' : chat.lastMessage.sender}: {chat.lastMessage.text}
-                      </p>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {new Date(chat.lastMessage.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
+          return (
+            <motion.div
+              key={chat.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.02 }}
+              onClick={() => handleChatClick(chat)}
+              className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-all"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-white">
+                    {otherParticipants.length === 1
+                      ? otherParticipants[0].name
+                      : `${otherParticipants[0].name} & ${otherParticipants.length - 1} others`}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {chat.lastMessage?.text || 'No messages yet'}
+                  </p>
                 </div>
+                <span className="text-xs text-gray-400">
+                  {chat.lastMessage?.createdAt && 
+                    formatDistanceToNow(new Date(chat.lastMessage.createdAt), { addSuffix: true })}
+                </span>
               </div>
-              
+
               {/* Order Status Section */}
               {chat.orderStatus && (
                 <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
@@ -216,7 +164,7 @@ const RecentChats = ({ onChatSelect }) => {
                 </div>
               )}
 
-              {/* Deposits Section - Show if any deposits exist */}
+              {/* Deposits Section */}
               {Object.keys(chat.deposits || {}).length > 0 && (
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span>Deposits: </span>
@@ -227,10 +175,16 @@ const RecentChats = ({ onChatSelect }) => {
                   ))}
                 </div>
               )}
-            </div>
-          </motion.div>
-        );
-      })}
+            </motion.div>
+          );
+        })
+      ) : (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <FontAwesomeIcon icon={faComments} className="text-4xl mb-2 text-orange-500" />
+          <p>No recent chats</p>
+          <p className="text-sm">Start a new chat to see it here!</p>
+        </div>
+      )}
     </div>
   );
 };

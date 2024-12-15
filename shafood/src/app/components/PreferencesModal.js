@@ -1,75 +1,153 @@
 import React, { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUtensils, faMapMarkerAlt, faMoneyBill, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { motion } from 'framer-motion';
 
-const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation }) => {
-  const [foodProviders, setFoodProviders] = useState([]);
-  const [priceRange, setPriceRange] = useState('');
-  const [locationRange, setLocationRange] = useState(7); // Default 7 km
+const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }) => {
+  const [preferences, setPreferences] = useState({
+    foodProviders: [],
+    priceRange: '',
+    locationRange: 7
+  });
 
-  const handleApply = () => {
-    onUpdate({ foodProviders, priceRange, locationRange });
-    onClose();
+  const foodProviderOptions = ['Swiggy', 'Zomato', 'UberEats'];
+  const priceRangeOptions = ['₹0-200', '₹200-500', '₹500-1000', '₹1000+'];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onUpdate(preferences);
   };
 
-  const availableProviders = ['Zomato', 'Swiggy', 'Zepto',]; // Example food providers
-
-  const handleProviderChange = (provider) => {
-    setFoodProviders((prev) => 
-      prev.includes(provider) 
-        ? prev.filter((p) => p !== provider) 
-        : [...prev, provider]
-    );
-  };
+  if (!isOpen) return null;
 
   return (
-    isOpen && (
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Update Preferences</h2>
-          <div>
-            <label className="block mb-2 text-gray-700 dark:text-gray-300">Food Providers:</label>
-            <div className="mb-4">
-              {availableProviders.map(provider => (
-                <div key={provider} className="flex items-center mb-2">
-                  <input
-                    type="checkbox"
-                    id={provider}
-                    value={provider}
-                    checked={foodProviders.includes(provider)}
-                    onChange={() => handleProviderChange(provider)}
-                    className="mr-2"
-                  />
-                  <label htmlFor={provider} className="cursor-pointer text-gray-700 dark:text-gray-300">{provider}</label>
-                </div>
-              ))}
+    <>
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1900]"
+        onClick={onClose}
+      />
+      
+      <div className={`fixed inset-0 flex items-center justify-center z-[2000] ${className}`}>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 m-4 max-w-md w-full max-h-[90vh] overflow-y-auto relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <FontAwesomeIcon icon={faTimes} className="text-xl" />
+          </button>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                Set Your Preferences
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose your food delivery preferences to find better matches
+              </p>
             </div>
-            <label className="block mb-2 text-gray-700 dark:text-gray-300">Price Range:</label>
-            <input
-              type="text"
-              value={priceRange}
-              onChange={(e) => setPriceRange(e.target.value)}
-              placeholder="e.g. 100-500"
-              className="border p-2 w-full mb-4 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-            />
-            <label className="block mb-2 text-gray-700 dark:text-gray-300">Location Range (km):</label>
-            <input
-              type="number"
-              value={locationRange}
-              onChange={(e) => setLocationRange(e.target.value)}
-              className="border p-2 w-full mb-4 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-            />
-          </div>
-          <div className="flex justify-end">
-            <button onClick={handleApply} className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition duration-200">
-              Update Preferences
+
+            {/* Food Providers */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Food Providers
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {foodProviderOptions.map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() => {
+                      setPreferences(prev => ({
+                        ...prev,
+                        foodProviders: prev.foodProviders.includes(provider)
+                          ? prev.foodProviders.filter(p => p !== provider)
+                          : [...prev.foodProviders, provider]
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      preferences.foodProviders.includes(provider)
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={faUtensils} className="mr-2" />
+                    {provider}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Location Range */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Location Range (km)
+              </label>
+              <div className="flex items-center gap-4">
+                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={preferences.locationRange}
+                  onChange={(e) => setPreferences(prev => ({
+                    ...prev,
+                    locationRange: parseInt(e.target.value)
+                  }))}
+                  className="w-full h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer dark:bg-orange-700"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3ch]">
+                  {preferences.locationRange}
+                </span>
+              </div>
+            </div>
+
+            {/* Price Range */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Price Range
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {priceRangeOptions.map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setPreferences(prev => ({
+                      ...prev,
+                      priceRange: range
+                    }))}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      preferences.priceRange === range
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={faMoneyBill} className="mr-2" />
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
+            >
+              <FontAwesomeIcon icon={faUtensils} />
+              Save Preferences
             </button>
-            <button onClick={onClose} className="ml-2 p-2 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-200">
-              Cancel
-            </button>
-          </div>
-        </div>
+          </form>
+        </motion.div>
       </div>
-    )
+    </>
   );
-}
+};
 
 export default PreferencesModal;

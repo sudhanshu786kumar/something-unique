@@ -15,6 +15,7 @@
     "@googlemaps/js-api-loader": "^1.16.8",
     "@headlessui/react": "^2.1.8",
     "@heroicons/react": "^2.1.5",
+    "@react-google-maps/api": "^2.20.3",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.0",
@@ -38,7 +39,8 @@
     "react-lottie-player": "^2.1.0",
     "react-toastify": "^10.0.5",
     "resend": "^4.0.1",
-    "swr": "^2.2.5"
+    "swr": "^2.2.5",
+    "use-places-autocomplete": "^4.0.1"
   },
   "devDependencies": {
     "eslint": "^8",

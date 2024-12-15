@@ -1,0 +1,77 @@
+/* Action Buttons */
+.btn-primary {
+  @apply bg-orange-500 text-white px-3 py-1.5 rounded-full text-sm font-medium
+  hover:bg-orange-600 transition-colors duration-200
+  disabled:opacity-50 disabled:cursor-not-allowed
+  focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-3 py-1.5 rounded-full text-sm font-medium
+  hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200
+  disabled:opacity-50 disabled:cursor-not-allowed
+  focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
+
+.btn-danger {
+  @apply bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium
+  hover:bg-red-600 transition-colors duration-200
+  disabled:opacity-50 disabled:cursor-not-allowed
+  focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+}
+
+/* Additional styles for OrderProcess */
+.status-progress {
+  @apply h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+}
+
+.status-progress-bar {
+  @apply h-full transition-all duration-500;
+}
+
+.user-card {
+  @apply bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm
+  transition-all duration-200 hover:shadow-md;
+}
+
+.user-card-selected {
+  @apply ring-2 ring-orange-500;
+}
+
+.user-card-current {
+  @apply border-l-4 border-blue-500;
+}
+
+.status-icon {
+  @apply text-2xl transition-colors duration-200;
+}
+
+/* Improved button styles */
+.btn-group {
+  @apply flex flex-wrap gap-2 justify-center mb-4;
+}
+
+.btn-icon {
+  @apply mr-2 text-lg;
+}
+
+/* Order Process Specific Styles */
+.order-progress-steps {
+  @apply mb-4 px-2;
+}
+
+.action-buttons-container {
+  @apply mt-4 px-4 space-y-2;
+}
+
+.status-step {
+  @apply flex flex-col items-center;
+}
+
+.status-step-icon {
+  @apply w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200;
+}
+
+.status-step-text {
+  @apply text-xs mt-1 text-center transition-colors duration-200;
+} 

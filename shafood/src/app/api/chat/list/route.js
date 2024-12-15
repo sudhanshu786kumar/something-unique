@@ -30,17 +30,14 @@ export async function GET() {
       ]
     }).toArray();
 
-    // Get all valid user IDs from chats
+    // Get all user IDs from chats (including current user)
     const uniqueUserIds = [...new Set(
       chats.flatMap(chat => 
-        chat.users.filter(userId => 
-          userId !== null && 
-          userId !== session.user.id
-        )
+        chat.users.filter(userId => userId !== null)
       )
     )];
 
-    // Get user details
+    // Get user details including current user
     const users = await db.collection('users').find({
       _id: { 
         $in: uniqueUserIds.map(id => 
@@ -57,7 +54,6 @@ export async function GET() {
       .filter(chat => {
         const validParticipants = chat.users.filter(userId => 
           userId !== null && 
-          userId !== session.user.id && 
           userMap.has(userId.toString())
         );
         return validParticipants.length > 0;
@@ -66,7 +62,6 @@ export async function GET() {
         const chatParticipants = chat.users
           .filter(userId => 
             userId !== null && 
-            userId !== session.user.id && 
             userMap.has(userId.toString())
           )
           .map(userId => {

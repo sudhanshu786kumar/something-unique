@@ -18,9 +18,9 @@ const Chat = ({
   onChatIdChange, 
   initialChatId,
   initialMessages,
-  hasMore: initialHasMore,
+  hasMore,
   onUnreadMessagesChange, 
-  onlineUsers, // Add this prop
+  onlineUsers,
   onClose
 }) => {
   const { data: session, status } = useSession();
@@ -41,7 +41,7 @@ const Chat = ({
 
   const [isMobile, setIsMobile] = useState(false);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [chatHasMore, setChatHasMore] = useState(hasMore || false);
 
   const [showBackButton, setShowBackButton] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
@@ -51,8 +51,14 @@ const Chat = ({
   // Add a ref to track if initial fetch is done
   const initialFetchDoneRef = useRef(false);
 
+  const [onlineUserSet, setOnlineUserSet] = useState(onlineUsers || new Set());
+
+  const handleAccessDenied = useCallback(() => {
+    toast.error("You don't have access to this chat");
+    router.push('/'); // Redirect to home or another appropriate page
+  }, [router]);
+
   const fetchMessages = useCallback(async (chatId, page = 1, force = false) => {
-    // Prevent duplicate fetches
     if (!force && initialFetchDoneRef.current && page === 1) return;
     if (loadingMessages) return;
 
@@ -67,7 +73,9 @@ const Chat = ({
         } else {
           setMessages(prevMessages => [...prevMessages, ...data.messages]);
         }
-        setHasMore(data.hasMore);
+        setChatHasMore(data.hasMore);
+      } else if (response.status === 403) {
+        handleAccessDenied();
       } else {
         throw new Error('Failed to fetch messages');
       }
@@ -77,7 +85,7 @@ const Chat = ({
     } finally {
       setLoadingMessages(false);
     }
-  }, [loadingMessages]);
+  }, [loadingMessages, handleAccessDenied]);
 
   // Initialize chat and fetch messages
   useEffect(() => {
@@ -140,11 +148,11 @@ const Chat = ({
   // Load more messages when scrolling up
   const handleScroll = useCallback((e) => {
     const { scrollTop } = e.target;
-    if (scrollTop === 0 && hasMore && !loadingMessages) {
+    if (scrollTop === 0 && chatHasMore && !loadingMessages) {
       const nextPage = Math.ceil(messages.length / 20) + 1;
       fetchMessages(chatId, nextPage);
     }
-  }, [hasMore, loadingMessages, messages.length, chatId, fetchMessages]);
+  }, [chatHasMore, loadingMessages, messages.length, chatId, fetchMessages]);
 
   const findOrCreateChatSession = useCallback(async (userIds) => {
     if (!session?.user || loading) {
@@ -183,7 +191,7 @@ const Chat = ({
       setMessages([]);
       setNewMessage('');
       setPage(1);
-      setHasMore(true);
+      setChatHasMore(true);
       
       // Create new chat session with selected users
       const userIds = selectedUsers.map(user => user.id);
@@ -320,11 +328,10 @@ const Chat = ({
         return;
       }
 
-      // Show loading toast
       const loadingToast = toast.loading('Calculating nearest location...');
 
-      // Rest of the existing calculateNearestLocation function...
-      const userIds = selectedUsers.map(user => user.id);
+      // Include current user in the userIds array
+      const userIds = [...selectedUsers.map(user => user.id), session.user.id];
       const locationsResponse = await fetch(`/api/users/locations?userIds=${userIds.join(',')}`);
       
       if (!locationsResponse.ok) {
@@ -431,7 +438,7 @@ const Chat = ({
   };
 
   const loadMoreMessages = () => {
-    if (hasMore && !loadingMessages) {
+    if (chatHasMore && !loadingMessages) {
       setPage(prevPage => prevPage + 1);
       fetchMessages(chatId, page + 1);
     }
@@ -631,13 +638,37 @@ const Chat = ({
       setMessages([]);
       setNewMessage('');
       setPage(1);
-      setHasMore(true);
+      setChatHasMore(true);
       
       // Create new chat session with selected users
       const userIds = selectedUsers.map(user => user.id);
       findOrCreateChatSession(userIds);
     }
   }, [selectedUsers, session?.user, location.search]); // Add location.search to dependencies
+
+  // Add security check when chat loads
+  useEffect(() => {
+    const validateChatAccess = async () => {
+      if (!chatId || !session?.user?.id) return;
+
+      try {
+        const response = await fetch(`/api/chat/${chatId}/validate`);
+        if (!response.ok) {
+          if (response.status === 403) {
+            toast.error("You don't have access to this chat");
+            router.push('/'); // Redirect to home
+          } else if (response.status === 401) {
+            router.push('/login'); // Redirect to login
+          }
+        }
+      } catch (error) {
+        console.error('Error validating chat access:', error);
+        router.push('/');
+      }
+    };
+
+    validateChatAccess();
+  }, [chatId, session?.user?.id, router]);
 
   if (status === 'loading') {
     return <div>Loading...</div>;
@@ -680,11 +711,11 @@ const Chat = ({
             {selectedUsers.length > 2 ? 'Group Chat' : 'Chat'}
           </h2>
         </div>
-        <SelectedUsersList users={selectedUsers} onRemove={removeUserFromChat} />
+        {/* <SelectedUsersList users={selectedUsers} onRemove={removeUserFromChat} /> */}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3 mb-16" onScroll={handleScroll}>
-        {hasMore && (
+        {chatHasMore && (
           <button onClick={loadMoreMessages} className="w-full text-center text-blue-500 hover:text-blue-600">
             Load More Messages
           </button>
@@ -722,7 +753,7 @@ const Chat = ({
                   <p className="font-semibold text-xs">{msg.sender}</p>
                   <FontAwesomeIcon 
                     icon={faCircle} 
-                    className={`ml-2 text-xs ${onlineUsers.has(msg.senderId) ? 'text-green-500' : 'text-gray-400'}`} 
+                    className={`ml-2 text-xs ${onlineUserSet.has(msg.senderId) ? 'text-green-500' : 'text-gray-400'}`} 
                   />
                 </div>
                 {renderMessage(msg)}
@@ -807,6 +838,14 @@ const Chat = ({
       )}
     </div>
   );
+};
+
+// Add PropTypes for better documentation and runtime checking
+Chat.defaultProps = {
+  initialMessages: [],
+  hasMore: false,
+  onlineUsers: new Set(),
+  onUnreadMessagesChange: () => {},
 };
 
 export default Chat;

@@ -20,17 +20,22 @@ export async function GET(request) {
 
     const client = await clientPromise;
     const db = client.db();
-    const chat = await db.collection('chats').findOne({ _id: new ObjectId(chatId) });
+
+    // Add security check
+    const chat = await db.collection('chats').findOne({
+        _id: new ObjectId(chatId),
+        users: session.user.id // Ensure user is a participant
+    });
 
     if (!chat) {
-        return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+        return NextResponse.json({ error: "Chat not found or access denied" }, { status: 403 });
     }
 
     return NextResponse.json({
         orderStatus: chat.orderStatus || 'pending',
         userStatuses: typeof chat.userStatuses === 'object' ? chat.userStatuses : {},
         orderer: chat.orderer || null
-      });
+    });
 }
 
 export async function POST(request) {
@@ -47,8 +52,22 @@ export async function POST(request) {
 
     const client = await clientPromise;
     const db = client.db();
+
+    // Add security check
+    const chat = await db.collection('chats').findOne({
+        _id: new ObjectId(chatId),
+        users: session.user.id
+    });
+
+    if (!chat) {
+        return NextResponse.json({ error: "Chat not found or access denied" }, { status: 403 });
+    }
+
     const result = await db.collection('chats').updateOne(
-        { _id: new ObjectId(chatId) },
+        { 
+            _id: new ObjectId(chatId),
+            users: session.user.id // Additional security check in update
+        },
         { $set: { [`userStatuses.${session.user.id}`]: status } }
     );
 
