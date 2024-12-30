@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/app/lib/mongodb';
 import bcrypt from 'bcryptjs';
 import { createUser, getUserByEmail } from '@/app/models/User';
 import { sendWelcomeEmail } from '@/app/services/emailService';
+import { generateAvatar } from '@/app/utils/avatarUtils';
 
 export async function POST(request) {
   try {
@@ -28,10 +29,14 @@ export async function POST(request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate random avatar
+    const avatarUrl = generateAvatar(email);
+
     const userId = await createUser({
       name,
       email,
       password: hashedPassword,
+      image: avatarUrl, // Save the avatar URL
     });
 
     // Send welcome email

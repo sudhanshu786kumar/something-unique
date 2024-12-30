@@ -1,10 +1,181 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faSpinner, faExclamationCircle, faUser, faUtensils, faTimes, faShoppingCart, faTruck, faHandshake, faUndo, faUserCheck, faCircle, faMoneyBill, faCrown, faUsers, faArrowRight, faHistory, faBan, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import Tooltip from './Tooltip';
 import Pusher from 'pusher-js';
 import { toast } from 'react-toastify';
+import { generateAvatar, getDefaultAvatar } from '@/app/utils/avatarUtils';
+import Avatar from '@/app/components/Avatar';
+
+const StatusUpdateModal = ({ onClose, onUpdate, currentStatus, isUpdating }) => {
+  const statusOptions = [
+    { value: 'ordered', label: 'Ordered', icon: faShoppingCart, color: 'orange' },
+    { value: 'paid', label: 'Paid', icon: faMoneyBill, color: 'green' },
+    { value: 'received', label: 'Received', icon: faCheckCircle, color: 'blue' }
+  ];
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold">Update Order Status</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {statusOptions.map(({ value, label, icon, color }) => {
+            const isDisabled = 
+              (value === 'paid' && currentStatus !== 'ordered') ||
+              (value === 'received' && currentStatus !== 'paid');
+
+            return (
+              <button
+                key={value}
+                onClick={() => onUpdate(value)}
+                disabled={isDisabled || isUpdating}
+                className={`
+                  w-full p-4 rounded-lg flex items-center gap-3 transition-colors
+                  ${isDisabled 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : `bg-${color}-50 hover:bg-${color}-100 dark:bg-${color}-900/20 dark:hover:bg-${color}-900/30`}
+                `}
+              >
+                <div className={`w-8 h-8 rounded-full bg-${color}-100 dark:bg-${color}-900/30 
+                  flex items-center justify-center`}>
+                  <FontAwesomeIcon icon={icon} className={`text-${color}-500`} />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium">{label}</p>
+                  {isDisabled && (
+                    <p className="text-sm text-gray-500">
+                      Complete previous steps first
+                    </p>
+                  )}
+                </div>
+                {currentStatus === value && (
+                  <span className="text-sm bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                    Current
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {isUpdating && (
+          <div className="mt-4 text-center text-gray-500">
+            <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
+            Updating status...
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
+const CompletionModal = ({ onClose }) => (
+  <Modal onClose={onClose}>
+    <div className="p-6 text-center">
+      <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+        <FontAwesomeIcon icon={faCheckCircle} className="text-3xl text-green-500" />
+      </div>
+      <h3 className="text-xl font-semibold mb-2">Order Completed!</h3>
+      <p className="text-gray-600 dark:text-gray-400 mb-4">
+        All users have received their orders.
+      </p>
+      <button
+        onClick={onClose}
+        className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </Modal>
+);
+
+const ResetConfirmModal = ({ onClose, onConfirm }) => (
+  <Modal onClose={onClose}>
+    <div className="p-6">
+      <h3 className="text-xl font-semibold mb-4">Reset Order Process?</h3>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        This will reset all progress and allow starting a new order. This action cannot be undone.
+      </p>
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
+        >
+          Reset Order
+        </button>
+      </div>
+    </div>
+  </Modal>
+);
+
+const OrderHistoryCard = ({ order, onCancel }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-3"
+  >
+    <div className="flex justify-between items-start mb-3">
+      <div>
+        <h4 className="font-medium text-gray-900 dark:text-white">{order.date}</h4>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Orderer: {order.ordererName}
+        </p>
+      </div>
+      <span className={`px-3 py-1 rounded-full text-sm ${
+        order.status === 'completed' 
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : order.status === 'cancelled'
+          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+      }`}>
+        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+      </span>
+    </div>
+    <div className="space-y-2">
+      {order.participants.map((participant, index) => (
+        <div key={index} className="flex items-center justify-between text-sm">
+          <span className="text-gray-600 dark:text-gray-300">{participant.name}</span>
+          <span className={`px-2 py-0.5 rounded ${
+            participant.status === 'received' 
+              ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+              : participant.status === 'paid'
+              ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+              : 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'
+          }`}>
+            {participant.status}
+          </span>
+        </div>
+      ))}
+    </div>
+    {order.status !== 'cancelled' && order.status !== 'completed' && (
+      <button
+        onClick={() => onCancel(order.id)}
+        className="mt-3 w-full py-2 px-4 bg-red-50 hover:bg-red-100 
+          text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2
+          dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400"
+      >
+        <FontAwesomeIcon icon={faBan} />
+        Cancel Order
+      </button>
+    )}
+  </motion.div>
+);
 
 const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
   const [orderStatus, setOrderStatus] = useState('pending');
@@ -15,6 +186,15 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
   const [receivedCount, setReceivedCount] = useState(0);
   const [error, setError] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [processStats, setProcessStats] = useState({
+    ordered: 0,
+    paid: 0,
+    received: 0
+  });
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Modified uniqueUsers logic to ensure current user is always included
   const uniqueUsers = useMemo(() => {
@@ -206,6 +386,58 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
     };
   }, [chatId]);
 
+  // Add status tracking
+  useEffect(() => {
+    if (userStatuses) {
+      const stats = {
+        ordered: 0,
+        paid: 0,
+        received: 0
+      };
+      
+      Object.values(userStatuses).forEach(status => {
+        if (status === 'ordered') stats.ordered++;
+        if (status === 'paid') stats.paid++;
+        if (status === 'received') stats.received++;
+      });
+      
+      setProcessStats(stats);
+
+      // Check if all users have marked as received
+      if (stats.received === users.length) {
+        setShowCompletionModal(true);
+      }
+    }
+  }, [userStatuses, users.length]);
+
+  // Status change handler
+  const handleStatusChange = async (newStatus) => {
+    if (isUpdating) return;
+    
+    try {
+      setIsUpdating(true);
+      setError(null);
+      
+      const response = await fetch('/api/order/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId,
+          status: newStatus
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+      
+      setShowStatusModal(false);
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (error) {
+      handleError(error, 'Failed to update status');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // Add action buttons based on order status and user role
   const renderActionButtons = () => {
     if (isUpdating) return null;
@@ -266,146 +498,445 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
     );
   };
 
+  // Add this new function to fetch order history
+  const fetchOrderHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/order/history?chatId=${chatId}`);
+      if (!response.ok) throw new Error('Failed to fetch order history');
+      const data = await response.json();
+      setOrderHistory(data.orders);
+    } catch (error) {
+      console.error('Error fetching order history:', error);
+      toast.error('Failed to load order history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [chatId]);
+
+  // Add to useEffect
+  useEffect(() => {
+    fetchOrderHistory();
+  }, [fetchOrderHistory]);
+
+  // Add cancel order function
+  const handleCancelOrder = async () => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    
+    try {
+      setIsUpdating(true);
+      const response = await fetch('/api/order/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to cancel order');
+      
+      await fetchOrderHistory(); // Refresh history after cancellation
+      toast.success('Order cancelled successfully');
+      setOrderStatus('pending');
+      setUserStatuses({});
+      setSelectedOrderer(null);
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error('Failed to cancel order');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // Update the UI structure
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
-      {/* Status Header */}
-      <div className="sticky top-0 bg-white dark:bg-gray-800 shadow-sm z-10 p-4">
+      {/* Fixed Header with Progress */}
+      <div className="sticky top-0 bg-white dark:bg-gray-800 shadow-md z-20 p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mb-4">
-            <h2 className="text-lg font-semibold flex items-center">
+          {/* Order Status Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
               <StatusIcon status={orderStatus} />
-              <span className="ml-2">
-                {orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}
-              </span>
+              <span>{orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}</span>
             </h2>
             {selectedOrderer && (
-              <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                <FontAwesomeIcon icon={faUser} className="mr-2" />
-                Orderer: {uniqueUsers.find(u => u.id === selectedOrderer)?.name || 'Unknown'}
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 
+                  rounded-lg transition-colors flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faUndo} className="text-xs" />
+                Reset Order
+              </button>
+            )}
+          </div>
+
+          {/* Progress Stats Cards */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <StatusCard
+              label="Ordered"
+              count={processStats.ordered}
+              total={users.length}
+              icon={faShoppingCart}
+              color="orange"
+            />
+            <StatusCard
+              label="Paid"
+              count={processStats.paid}
+              total={users.length}
+              icon={faMoneyBill}
+              color="green"
+            />
+            <StatusCard
+              label="Received"
+              count={processStats.received}
+              total={users.length}
+              icon={faCheckCircle}
+              color="blue"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Current Order Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+          <h3 className="text-md font-medium mb-3 flex items-center gap-2">
+            <FontAwesomeIcon icon={faUtensils} className="text-orange-500" />
+            Current Order
+          </h3>
+
+          {orderStatus === 'pending' && !selectedOrderer ? (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg mb-4">
+              <p className="text-yellow-700 dark:text-yellow-300 flex items-center gap-2">
+                <FontAwesomeIcon icon={faExclamationTriangle} />
+                Select someone to manage this order
+              </p>
+            </div>
+          ) : null}
+
+          {/* Users List */}
+          <div className="space-y-3">
+            {uniqueUsers && uniqueUsers.length > 0 ? (
+              uniqueUsers.map(user => (
+                <motion.div
+                  key={user.id}
+                  whileHover={{ scale: 1.01 }}
+                  className={`
+                    relative bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm
+                    ${user.id === selectedOrderer ? 'ring-2 ring-orange-500' : ''}
+                    ${user.id === currentUserId ? 'border-l-4 border-blue-500' : ''}
+                    ${orderStatus === 'pending' && !selectedOrderer ? 'cursor-pointer hover:shadow-md' : ''}
+                    transition-all duration-200
+                  `}
+                  onClick={() => orderStatus === 'pending' && !selectedOrderer && toggleOrderer(user.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    {/* User Info */}
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <Avatar 
+                        user={user}
+                        size="md"
+                        showOnline={true}
+                        onlineStatus={onlineUsers.has(user.id)}
+                      />
+
+                      {/* User Details */}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-800 dark:text-white">
+                            {user.name}
+                          </span>
+                          {user.id === currentUserId && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                              You
+                            </span>
+                          )}
+                          {user.id === selectedOrderer && (
+                            <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                              Orderer
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          {userStatuses[user.id] ? (
+                            <span className="flex items-center gap-2">
+                              <StatusIcon status={userStatuses[user.id]} />
+                              {userStatuses[user.id].charAt(0).toUpperCase() + userStatuses[user.id].slice(1)}
+                            </span>
+                          ) : (
+                            'Waiting'
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      {orderStatus === 'pending' && !selectedOrderer && user.id !== currentUserId && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleOrderer(user.id);
+                          }}
+                          className="px-3 py-1 text-sm bg-orange-100 hover:bg-orange-200 
+                            dark:bg-orange-900/30 dark:hover:bg-orange-900/50 
+                            text-orange-600 dark:text-orange-400 rounded-full transition-colors"
+                        >
+                          Select as Orderer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <FontAwesomeIcon icon={faUsers} className="text-3xl mb-2" />
+                <p>No users found</p>
               </div>
             )}
           </div>
 
-          {/* Progress Steps */}
-          <div className="order-progress-steps">
-            <div className="flex justify-between mb-2">
-              {['pending', 'ordered', 'delivered', 'completed'].map((step, index) => (
-                <div key={step} className="flex flex-col items-center flex-1">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center
-                    ${orderStatus === step ? 'bg-orange-500 text-white' :
-                      orderStatus === 'completed' || 
-                      ['pending', 'ordered', 'delivered'].indexOf(orderStatus) > 
-                      ['pending', 'ordered', 'delivered'].indexOf(step)
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-500'}`}>
-                    <FontAwesomeIcon icon={getStatusIcon(step)} />
-                  </div>
-                  <span className="text-xs mt-1 hidden sm:block">
-                    {step.charAt(0).toUpperCase() + step.slice(1)}
-                  </span>
+          {/* Cancel Order Button */}
+          {orderStatus !== 'pending' && (
+            <button
+              onClick={handleCancelOrder}
+              className="mt-4 w-full py-2 px-4 bg-red-50 hover:bg-red-100 
+                text-red-600 rounded-lg transition-colors flex items-center justify-center gap-2
+                dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400"
+            >
+              <FontAwesomeIcon icon={faBan} />
+              Cancel Order
+            </button>
+          )}
+        </div>
+
+        {/* Order History Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+          <h3 className="text-md font-medium mb-3 flex items-center gap-2">
+            <FontAwesomeIcon icon={faHistory} className="text-blue-500" />
+            Order History
+          </h3>
+
+          {loadingHistory ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-24 bg-gray-100 dark:bg-gray-700 rounded-lg"></div>
                 </div>
               ))}
             </div>
+          ) : orderHistory.length > 0 ? (
+            <div className="space-y-3">
+              {orderHistory.map((order) => (
+                <OrderHistoryCard
+                  key={order.id}
+                  order={order}
+                  onCancel={handleCancelOrder}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <FontAwesomeIcon 
+                icon={faHistory} 
+                className="text-gray-400 dark:text-gray-500 text-3xl mb-2" 
+              />
+              <p className="text-gray-500 dark:text-gray-400">No order history yet</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed Bottom Action Bar */}
+      <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 shadow-lg">
+        <div className="max-w-3xl mx-auto">
+          <button
+            onClick={() => setShowStatusModal(true)}
+            disabled={isUpdating}
+            className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 
+              text-white rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+          >
+            {isUpdating ? (
+              <FontAwesomeIcon icon={faSpinner} spin />
+            ) : (
+              <FontAwesomeIcon icon={faArrowRight} />
+            )}
+            Update My Status
+          </button>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {showStatusModal && (
+          <StatusUpdateModal
+            onClose={() => setShowStatusModal(false)}
+            onUpdate={handleStatusChange}
+            currentStatus={userStatuses[currentUserId] || 'pending'}
+            isUpdating={isUpdating}
+          />
+        )}
+        {showResetConfirm && (
+          <ResetConfirmModal
+            onClose={() => setShowResetConfirm(false)}
+            onConfirm={handleReset}
+          />
+        )}
+        {showCompletionModal && (
+          <CompletionModal onClose={() => setShowCompletionModal(false)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// Update the UserCard component for better UX
+const UserCard = ({ user, isOrderer, isCurrentUser, userStatus, orderStatus, onToggleOrderer, isOnline, canBeOrderer }) => {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className={`
+        relative bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm mb-3
+        ${isOrderer ? 'ring-2 ring-orange-500' : ''}
+        ${isCurrentUser ? 'border-l-4 border-blue-500' : ''}
+        ${canBeOrderer ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}
+        transition-all duration-200
+      `}
+      onClick={() => canBeOrderer && onToggleOrderer()}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* User Avatar */}
+          <div className="relative">
+            <img 
+              src={user.image || getDefaultAvatar(user.email)}
+              alt={user.name} 
+              className="w-10 h-10 rounded-full object-cover bg-orange-50 dark:bg-gray-700"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = getDefaultAvatar(user.email);
+              }}
+            />
+            {isOnline && (
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full" />
+            )}
           </div>
 
-          {/* Action Buttons */}
-          {renderActionButtons()}
+          {/* User Info */}
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-800 dark:text-white">
+                {user.name}
+              </span>
+              {isCurrentUser && (
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">You</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              {isOrderer ? (
+                <span className="text-sm bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                  Orderer
+                </span>
+              ) : (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {userStatus.charAt(0).toUpperCase() + userStatus.slice(1)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Status Indicators */}
+        <div className="flex items-center gap-3">
+          {canBeOrderer && !isOrderer && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleOrderer();
+              }}
+              className="px-3 py-1 text-sm bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 
+                dark:hover:bg-orange-900/50 text-orange-600 dark:text-orange-400 rounded-full transition-colors"
+            >
+              Select as Orderer
+            </button>
+          )}
+          <StatusIcon status={userStatus} />
         </div>
       </div>
 
-      {/* User List */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-3xl mx-auto space-y-4">
-          {uniqueUsers.map(user => (
-            <UserCard 
-              key={user.id}
-              user={user}
-              isOrderer={user.id === selectedOrderer}
-              isCurrentUser={user.id === currentUserId}
-              userStatus={userStatuses[user.id]?.status || 'waiting'}
-              orderStatus={orderStatus}
-              onToggleOrderer={() => toggleOrderer(user.id)}
-              isOnline={onlineUsers.has(user.id)}
-              canBeOrderer={orderStatus === 'pending' || orderStatus === 'completed'}
-            />
-          ))}
+      {/* Progress Indicators */}
+      {(userStatus === 'ordered' || userStatus === 'paid' || userStatus === 'received') && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <FontAwesomeIcon 
+                icon={faShoppingCart} 
+                className={userStatus === 'ordered' ? 'text-orange-500' : 'text-gray-400'} 
+              />
+              <FontAwesomeIcon 
+                icon={faMoneyBill} 
+                className={userStatus === 'paid' ? 'text-green-500' : 'text-gray-400'} 
+              />
+              <FontAwesomeIcon 
+                icon={faCheckCircle} 
+                className={userStatus === 'received' ? 'text-blue-500' : 'text-gray-400'} 
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+    </motion.div>
+  );
+};
 
-      {/* Reset Confirmation Modal */}
-      {showResetConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full"
-          >
-            <h3 className="text-lg font-semibold mb-4">Reset Order Process?</h3>
+// Add a separate Reset Order component
+const ResetOrderButton = ({ onReset, isOrderer }) => {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  if (!isOrderer) return null;
+
+  return (
+    <>
+      <button
+        onClick={() => setShowConfirm(true)}
+        className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 
+          hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 
+          dark:text-red-400 rounded-lg transition-colors"
+      >
+        <FontAwesomeIcon icon={faUndo} />
+        Reset Order Process
+      </button>
+
+      {showConfirm && (
+        <Modal onClose={() => setShowConfirm(false)}>
+          <div className="p-6">
+            <h3 className="text-xl font-semibold mb-4">Reset Order Process?</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              This will reset the entire order process. All progress will be lost.
+              This will reset all progress and allow starting a new order. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowResetConfirm(false)}
-                className="btn-secondary"
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  handleOrderAction('reset');
-                  setShowResetConfirm(false);
+                  onReset();
+                  setShowConfirm(false);
                 }}
-                className="btn-danger"
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
               >
-                Reset
+                Reset Order
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Separate UserCard component for better organization
-const UserCard = ({ user, isOrderer, isCurrentUser, userStatus, orderStatus, onToggleOrderer, isOnline, canBeOrderer }) => {
-  return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className={`
-        relative bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm
-        ${isOrderer ? 'ring-2 ring-orange-500' : ''}
-        ${isCurrentUser ? 'border-l-4 border-blue-500' : ''}
-        ${orderStatus === 'pending' ? 'cursor-pointer' : 'cursor-default'}
-      `}
-      onClick={() => orderStatus === 'pending' && onToggleOrderer()}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          {user.image ? (
-            <img src={user.image} alt={user.name} className="w-10 h-10 rounded-full" />
-          ) : (
-            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-              <FontAwesomeIcon icon={faUser} className="text-gray-500" />
-            </div>
-          )}
-          <div>
-            <div className="flex items-center">
-              <span className="font-medium">{user.name}</span>
-              {isOnline && (
-                <span className="ml-2 w-2 h-2 bg-green-500 rounded-full" />
-              )}
-            </div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {isOrderer ? 'Orderer' : userStatus.charAt(0).toUpperCase() + userStatus.slice(1)}
-            </span>
           </div>
-        </div>
-        <StatusIcon status={userStatus} />
-      </div>
-    </motion.div>
+        </Modal>
+      )}
+    </>
   );
 };
 
@@ -439,6 +970,57 @@ const getStatusIcon = (status) => {
     default: return faUser;
   }
 };
+
+// Helper Components
+const StatusCard = ({ label, count, total, icon, color }) => (
+  <motion.div
+    whileHover={{ scale: 1.02 }}
+    className={`bg-${color}-50 dark:bg-${color}-900/20 p-3 rounded-lg`}
+  >
+    <div className="flex items-center justify-between">
+      <FontAwesomeIcon icon={icon} className={`text-${color}-500 text-xl`} />
+      <span className={`text-${color}-600 font-semibold`}>
+        {count}/{total}
+      </span>
+    </div>
+    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{label}</p>
+  </motion.div>
+);
+
+const StatusButton = ({ label, onClick, icon, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`w-full p-3 rounded-lg flex items-center gap-3 transition-colors ${
+      disabled
+        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+        : 'bg-white hover:bg-gray-50 text-gray-800 border border-gray-200'
+    }`}
+  >
+    <FontAwesomeIcon icon={icon} />
+    <span>{label}</span>
+  </button>
+);
+
+const Modal = ({ children, onClose }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.9, opacity: 0 }}
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4"
+      onClick={e => e.stopPropagation()}
+    >
+      {children}
+    </motion.div>
+  </motion.div>
+);
 
 export default OrderProcess;
 

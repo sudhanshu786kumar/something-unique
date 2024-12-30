@@ -46,14 +46,14 @@ export async function POST(request) {
 
     const { chatId, status } = await request.json();
 
-    if (!chatId || !status) {
-        return NextResponse.json({ error: "Chat ID and status are required" }, { status: 400 });
+    if (!chatId || !status || !['ordered', 'paid', 'received'].includes(status)) {
+        return NextResponse.json({ error: "Invalid status or chat ID" }, { status: 400 });
     }
 
     const client = await clientPromise;
     const db = client.db();
 
-    // Add security check
+    // Get current chat and validate status progression
     const chat = await db.collection('chats').findOne({
         _id: new ObjectId(chatId),
         users: session.user.id
@@ -63,10 +63,20 @@ export async function POST(request) {
         return NextResponse.json({ error: "Chat not found or access denied" }, { status: 403 });
     }
 
+    const currentStatus = chat.userStatuses?.[session.user.id] || 'pending';
+    
+    // Validate status progression
+    if (status === 'paid' && currentStatus !== 'ordered') {
+        return NextResponse.json({ error: "Must mark as ordered first" }, { status: 400 });
+    }
+    if (status === 'received' && currentStatus !== 'paid') {
+        return NextResponse.json({ error: "Must mark as paid first" }, { status: 400 });
+    }
+
     const result = await db.collection('chats').updateOne(
         { 
             _id: new ObjectId(chatId),
-            users: session.user.id // Additional security check in update
+            users: session.user.id
         },
         { $set: { [`userStatuses.${session.user.id}`]: status } }
     );

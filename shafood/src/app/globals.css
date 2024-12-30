@@ -57,3 +57,72 @@ html {
   background-color: #f97316;
   border-radius: 3px;
 }
+
+/* Add these styles for better transitions */
+.user-card-transition {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.status-icon-transition {
+  @apply transition-colors duration-200;
+}
+
+/* Progress indicator styles */
+.progress-step {
+  @apply flex items-center;
+}
+
+.progress-step-active {
+  @apply text-orange-500;
+}
+
+.progress-step-completed {
+  @apply text-green-500;
+}
+
+.progress-step-pending {
+  @apply text-gray-300 dark:text-gray-600;
+}
+
+/* Order Process specific styles */
+.order-process-container {
+  @apply h-full flex flex-col bg-gray-50 dark:bg-gray-900;
+}
+
+.order-process-header {
+  @apply sticky top-0 z-20 bg-white dark:bg-gray-800 shadow-md;
+}
+
+.order-process-content {
+  @apply flex-1 overflow-y-auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.status-card {
+  @apply relative overflow-hidden rounded-lg transition-all duration-200 hover:scale-105;
+}
+
+.user-card {
+  @apply relative rounded-lg transition-all duration-200;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .order-process-header {
+    @apply p-3;
+  }
+  
+  .status-cards-grid {
+    @apply grid-cols-1 gap-2;
+  }
+  
+  .user-card {
+    @apply p-3;
+  }
+}
+
+/* Smooth scrolling */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}

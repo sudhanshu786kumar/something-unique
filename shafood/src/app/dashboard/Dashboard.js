@@ -35,6 +35,8 @@ const Dashboard = () => {
   const [userLocations, setUserLocations] = useState({});
   const [isSearching, setIsSearching] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [locationError, setLocationError] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   useEffect(() => {
     if (location) {
@@ -328,7 +330,7 @@ const Dashboard = () => {
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500 text-xl" />
                   <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Current Location</h2>
                 </div>
-                {!showLocationSearch && (
+                {!showLocationSearch && !isLoadingLocation && (
                   <button
                     onClick={() => setShowLocationSearch(true)}
                     className="px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 rounded-lg transition-colors flex items-center gap-2"
@@ -339,9 +341,82 @@ const Dashboard = () => {
                 )}
               </div>
               
+              {isLoadingLocation ? (
+                <div className="mt-4 flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <FontAwesomeIcon icon={faSpinner} spin className="text-orange-500 mr-2" />
+                  <span className="text-gray-600 dark:text-gray-300">Fetching location...</span>
+                </div>
+              ) : locationError ? (
+                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-lg">
+                  <p className="text-red-700 dark:text-red-300 font-medium">Location Error</p>
+                  <p className="text-red-600 dark:text-red-400 text-sm mt-1">{locationError}</p>
+                  <button
+                    onClick={() => {
+                      setLocationError(null);
+                      setShowLocationSearch(true);
+                    }}
+                    className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
+                  >
+                    Try setting location manually
+                  </button>
+                </div>
+              ) : currentLocation && !showLocationSearch ? (
+                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  {currentLocation.address ? (
+                    <>
+                      <p className="text-gray-700 dark:text-gray-300 break-words">
+                        {currentLocation.address}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {`${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center text-center p-4">
+                      <p className="text-gray-600 dark:text-gray-400 mb-2">
+                        Location coordinates available but address couldn't be retrieved
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {`${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`}
+                      </p>
+                      <button
+                        onClick={() => setShowLocationSearch(true)}
+                        className="mt-3 text-sm text-orange-500 hover:text-orange-600 underline"
+                      >
+                        Set location manually
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : !showLocationSearch ? (
+                <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg text-center">
+                  <p className="text-orange-700 dark:text-orange-300 mb-2">
+                    No location set
+                  </p>
+                  <button
+                    onClick={() => setShowLocationSearch(true)}
+                    className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 underline"
+                  >
+                    Set your location
+                  </button>
+                </div>
+              ) : null}
+              
               {showLocationSearch && (
                 <div className="relative">
-                  <LocationSearchBox />
+                  <LocationSearchBox 
+                    onLocationSelect={(location) => {
+                      setCurrentLocation(location);
+                      setShowLocationSearch(false);
+                      setLocationError(null);
+                      localStorage.setItem('userLocation', JSON.stringify(location));
+                      toast.success('Location updated successfully!');
+                    }}
+                    onError={(error) => {
+                      setLocationError(error);
+                      toast.error(error);
+                    }}
+                  />
                   <button
                     onClick={() => setShowLocationSearch(false)}
                     className="absolute top-0 right-0 mt-3 mr-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

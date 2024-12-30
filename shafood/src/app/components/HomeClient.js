@@ -243,7 +243,9 @@ export default function HomeClient({ steps }) {
       };
       
       localStorage.setItem('userLocation', JSON.stringify(newLocation));
-      router.push('/dashboard');
+      setSelectedLocation(newLocation);
+      setShowPreferencesModal(true);
+      toast.success('Location set! Now set your preferences.');
     } catch (error) {
       console.error('Error setting location:', error);
       toast.error('Failed to set location. Please try again.');
@@ -258,11 +260,29 @@ export default function HomeClient({ steps }) {
     }
   }, []);
 
-  const handlePreferencesUpdate = (newPreferences) => {
-    setPreferences(newPreferences);
-    setShowPreferencesModal(false);
-    localStorage.setItem('pendingPreferences', JSON.stringify(newPreferences));
-    router.push('/login?redirect=chat');
+  const handlePreferencesUpdate = async (newPreferences) => {
+    try {
+      const response = await fetch('/api/users/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPreferences),
+      });
+
+      if (!response.ok) throw new Error('Failed to update preferences');
+
+      localStorage.setItem('pendingPreferences', JSON.stringify(newPreferences));
+      setPreferences(newPreferences);
+      setShowPreferencesModal(false);
+      
+      // Only redirect if both location and preferences are set
+      if (selectedLocation) {
+        router.push('/dashboard');
+        toast.success('All set! Redirecting to dashboard...');
+      }
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast.error('Failed to update preferences');
+    }
   };
 
   useEffect(() => {
