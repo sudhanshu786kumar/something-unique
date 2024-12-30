@@ -1,21 +1,99 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUtensils, faMapMarkerAlt, faMoneyBill, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faUtensils, faMapMarkerAlt, faMoneyBill, faTimes, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { motion } from 'framer-motion';
+import { useSession } from 'next-auth/react';
+import { toast } from 'react-toastify';
 
 const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }) => {
+  const { data: session } = useSession();
   const [preferences, setPreferences] = useState({
     foodProviders: [],
     priceRange: '',
     locationRange: 7
   });
+  const [customProvider, setCustomProvider] = useState('');
 
   const foodProviderOptions = ['Swiggy', 'Zomato', 'UberEats'];
   const priceRangeOptions = ['₹0-200', '₹200-500', '₹500-1000', '₹1000+'];
 
-  const handleSubmit = (e) => {
+  const handleAddCustomProvider = (e) => {
     e.preventDefault();
-    onUpdate(preferences);
+    if (customProvider.trim()) {
+      if (!preferences.foodProviders.includes(customProvider.trim())) {
+        setPreferences(prev => ({
+          ...prev,
+          foodProviders: [...prev.foodProviders, customProvider.trim()]
+        }));
+      }
+      setCustomProvider('');
+    }
+  };
+
+  const handleRemoveProvider = (provider) => {
+    setPreferences(prev => ({
+      ...prev,
+      foodProviders: prev.foodProviders.filter(p => p !== provider)
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!session?.user?.id) {
+      toast.error('User session not found');
+      return;
+    }
+
+    // Validate preferences before sending
+    if (preferences.foodProviders.length === 0) {
+      toast.error('Please select at least one food provider');
+      return;
+    }
+
+    if (!preferences.priceRange) {
+      toast.error('Please select a price range');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/users/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          foodProviders: preferences.foodProviders,
+          priceRange: preferences.priceRange,
+          locationRange: Number(preferences.locationRange)
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Preferences update failed:', errorData);
+        throw new Error(errorData.error || 'Failed to update preferences');
+      }
+
+      const data = await response.json();
+      onUpdate(preferences);
+      toast.success('Preferences updated successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast.error(error.message || 'Failed to update preferences', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
   };
 
   if (!isOpen) return null;
@@ -58,7 +136,32 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Food Providers
               </label>
+              
+              {/* Custom Provider Input */}
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={customProvider}
+                  onChange={(e) => setCustomProvider(e.target.value)}
+                  placeholder="Add custom provider"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                           text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                           focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomProvider}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600
+                           transition-colors flex items-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  Add
+                </button>
+              </div>
+
+              {/* Provider Tags */}
               <div className="flex flex-wrap gap-2">
+                {/* Default Providers */}
                 {foodProviderOptions.map((provider) => (
                   <button
                     key={provider}
@@ -81,6 +184,23 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }
                     {provider}
                   </button>
                 ))}
+
+                {/* Custom Providers */}
+                {preferences.foodProviders
+                  .filter(provider => !foodProviderOptions.includes(provider))
+                  .map((provider) => (
+                    <button
+                      key={provider}
+                      type="button"
+                      onClick={() => handleRemoveProvider(provider)}
+                      className="px-4 py-2 rounded-full text-sm font-medium bg-orange-500 text-white
+                               hover:bg-orange-600 transition-colors flex items-center gap-2"
+                    >
+                      <FontAwesomeIcon icon={faUtensils} className="mr-1" />
+                      {provider}
+                      <FontAwesomeIcon icon={faTimes} className="ml-1" />
+                    </button>
+                  ))}
               </div>
             </div>
 

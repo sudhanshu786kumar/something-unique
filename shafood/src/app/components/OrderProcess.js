@@ -345,7 +345,45 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
     }
   };
 
-  // Initialize Pusher and handle real-time updates
+  // Define fetchOrderState function
+  const fetchOrderState = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/order/status?chatId=${chatId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch order state');
+      }
+
+      const data = await response.json();
+      setOrderStatus(data.orderStatus);
+      setUserStatuses(data.userStatuses || {});
+      setSelectedOrderer(data.orderer);
+
+      // Update process stats
+      const stats = {
+        ordered: 0,
+        paid: 0,
+        received: 0
+      };
+      
+      Object.values(data.userStatuses || {}).forEach(status => {
+        if (status === 'ordered') stats.ordered++;
+        if (status === 'paid') stats.paid++;
+        if (status === 'received') stats.received++;
+      });
+      
+      setProcessStats(stats);
+    } catch (error) {
+      console.error('Error fetching order state:', error);
+      handleError(error, 'Failed to load order state');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Enhance the Pusher subscription and event handling
   useEffect(() => {
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
@@ -355,36 +393,48 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
     const channel = pusher.subscribe(`order-${chatId}`);
 
     channel.bind('order-update', (data) => {
+      console.log('Received real-time update:', data);
+      
+      // Immediately update local state with new data
       setOrderStatus(data.orderStatus);
       setUserStatuses(data.userStatuses || {});
       setSelectedOrderer(data.orderer);
+
+      // Update process stats
+      const stats = {
+        ordered: 0,
+        paid: 0,
+        received: 0
+      };
+      
+      Object.values(data.userStatuses || {}).forEach(status => {
+        if (status === 'ordered') stats.ordered++;
+        if (status === 'paid') stats.paid++;
+        if (status === 'received') stats.received++;
+      });
+      
+      setProcessStats(stats);
+
+      // Show toast notification for updates from other users
+      if (data.updatedBy !== currentUserId) {
+        toast.info(`Order status updated to ${data.orderStatus}`);
+      }
     });
 
-    // Fetch initial order state
-    const fetchOrderState = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/order/status?chatId=${chatId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setOrderStatus(data.orderStatus);
-          setUserStatuses(data.userStatuses);
-          setSelectedOrderer(data.orderer);
-        }
-      } catch (error) {
-        handleError(error, 'Failed to load order state');
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Error handling for Pusher
+    channel.bind('pusher:subscription_error', (error) => {
+      console.error('Pusher subscription error:', error);
+      toast.error('Failed to connect to real-time updates');
+    });
 
+    // Fetch initial state
     fetchOrderState();
 
     return () => {
       channel.unbind_all();
       pusher.unsubscribe(`order-${chatId}`);
     };
-  }, [chatId]);
+  }, [chatId, currentUserId]);
 
   // Add status tracking
   useEffect(() => {
@@ -410,7 +460,7 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
     }
   }, [userStatuses, users.length]);
 
-  // Status change handler
+  // Update the handleStatusChange function
   const handleStatusChange = async (newStatus) => {
     if (isUpdating) return;
     
@@ -418,19 +468,24 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
       setIsUpdating(true);
       setError(null);
       
-      const response = await fetch('/api/order/status', {
+      const response = await fetch('/api/order/updateStatus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chatId,
-          status: newStatus
+          status: newStatus,
+          timestamp: new Date().toISOString()
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to update status');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update status');
+      }
       
       setShowStatusModal(false);
-      toast.success(`Status updated to ${newStatus}`);
+      // Local toast only for the user who made the change
+      toast.success(`Your status updated to ${newStatus}`);
     } catch (error) {
       handleError(error, 'Failed to update status');
     } finally {
@@ -542,6 +597,29 @@ const OrderProcess = ({ chatId, users, currentUserId, onlineUsers }) => {
       toast.error('Failed to cancel order');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Define handleReset function
+  const handleReset = async () => {
+    try {
+      // Reset the order state in the database
+      const response = await fetch(`/api/orders/${chatId}/reset`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reset order');
+      }
+
+      // Reset local state
+      setOrderStatus('pending');
+      setUserStatuses({});
+      setSelectedOrderer(null);
+      toast.success('Order process has been reset');
+    } catch (error) {
+      console.error('Error resetting order:', error);
+      toast.error('Failed to reset order process');
     }
   };
 
