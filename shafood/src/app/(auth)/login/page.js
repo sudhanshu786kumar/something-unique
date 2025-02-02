@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGoogle, faGithub, faSpinner } from '@fortawesome/free-brands-svg-icons';
+import { faGoogle, faGithub } from '@fortawesome/free-brands-svg-icons';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 
