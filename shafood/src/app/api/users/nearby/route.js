@@ -18,12 +18,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
+    const isGuest = searchParams.get('isGuest') === 'true';
     const latitude = parseFloat(searchParams.get('latitude'));
     const longitude = parseFloat(searchParams.get('longitude'));
     const radius = parseFloat(searchParams.get('radius')) || 7;
@@ -33,23 +29,10 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Invalid location' }, { status: 400 });
     }
 
-    console.log('Search parameters:', {
-      latitude,
-      longitude,
-      radius,
-      foodProviders
-    });
-
     const allUsers = await getAllUsers();
     
     const nearbyUsers = allUsers
       .filter(user => {
-        // Skip if it's the current user
-        if (user._id.toString() === session.user.id) return false;
-
-        // Skip if user is not online
-        if (!user.online && !user.isOnline) return false;
-
         // Skip if no location
         if (!user.location?.latitude || !user.location?.longitude) return false;
 
@@ -67,39 +50,28 @@ export async function GET(request) {
         // Check if food providers match (if specified)
         if (foodProviders.length > 0) {
           const userProviders = user.foodProviders || user.preferences?.foodProviders || [];
-          if (!foodProviders.some(provider => userProviders.includes(provider))) {
-            return false;
-          }
+          return foodProviders.some(provider => userProviders.includes(provider));
         }
 
         return true;
       })
-      .map(user => {
-        // Calculate distance once for each user
-        const distance = calculateDistance(
+      .map(user => ({
+        id: user._id.toString(),
+        name: user.name,
+        distance: Number(calculateDistance(
           latitude,
           longitude,
           user.location.latitude,
           user.location.longitude
-        );
-
-        return {
-          id: user._id.toString(),
-          name: user.name,
-          distance: Number(distance.toFixed(1)), // Keep as number but rounded to 1 decimal
-          preferredProviders: user.foodProviders || user.preferences?.foodProviders || [],
-          online: user.online || user.isOnline || false,
-          lastSeen: user.lastSeen || user.updatedAt,
-          location: user.location
-        };
-      })
-      .sort((a, b) => a.distance - b.distance); // Sort by distance
-
-    console.log(`Found ${nearbyUsers.length} nearby users`);
+        ).toFixed(1)),
+        preferredProviders: user.foodProviders || user.preferences?.foodProviders || [],
+        location: user.location
+      }))
+      .sort((a, b) => a.distance - b.distance);
 
     return NextResponse.json(nearbyUsers);
   } catch (error) {
-    console.error('Error fetching nearby users:', error);
-    return NextResponse.json({ error: 'Failed to fetch nearby users' }, { status: 500 });
+    console.error('Error in nearby users API:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

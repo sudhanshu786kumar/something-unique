@@ -16,7 +16,8 @@ export async function POST(request) {
     }
 
     try {
-        const chatId = await findOrCreateChatSession(userIds, session.user.id);
+        const allUserIds = Array.from(new Set([...userIds, session.user.id]));
+        const chatId = await findOrCreateChatSession(allUserIds, session.user.id);
         return NextResponse.json({ chatId }, { status: 200 });
     } catch (error) {
         console.error('Error finding or creating chat session:', error);

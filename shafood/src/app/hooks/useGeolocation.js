@@ -1,104 +1,66 @@
-import { useEffect, useState } from 'react';
+'use client';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Pusher from 'pusher-js';
 
 const useLocation = () => {
   const { data: session } = useSession();
   const [location, setLocation] = useState(null);
+  const [loadingLocation, setLoadingLocation] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      setLoadingLocation(false);
+      return;
+    }
 
-    // First try to get cached location from localStorage
-    const cachedLocation = localStorage.getItem('userLocation');
-    if (cachedLocation) {
+    // Try to get location from localStorage first
+    const savedLocation = localStorage.getItem('userLocation');
+    if (savedLocation) {
       try {
-        const parsed = JSON.parse(cachedLocation);
-        const cacheTime = new Date(parsed.timestamp);
-        const now = new Date();
-        // Use cached location if it's less than 5 minutes old
-        if (now - cacheTime < 5 * 60 * 1000) {
-          setLocation({ latitude: parsed.latitude, longitude: parsed.longitude });
-        }
-      } catch (error) {
-        console.error('Error parsing cached location:', error);
+        const parsedLocation = JSON.parse(savedLocation);
+        setLocation(parsedLocation);
+        setLoadingLocation(false);
+      } catch (e) {
+        console.error('Error parsing saved location:', e);
       }
     }
 
-    // Function to update location in both state and backend
-    const updateLocation = async (position) => {
-      const { latitude, longitude } = position.coords;
-      
-      // Update state immediately
-      setLocation({ latitude, longitude });
-
-      // Cache location with timestamp
-      localStorage.setItem('userLocation', JSON.stringify({
-        latitude,
-        longitude,
-        timestamp: new Date()
-      }));
-
-      try {
-        const response = await fetch('/api/location', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: session.user.id, latitude, longitude }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update location');
-        }
-      } catch (error) {
-        console.error('Error updating location:', error);
-      }
-    };
-
-    // Options for geolocation
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000, // 10 seconds timeout
-      maximumAge: 300000 // Accept positions up to 5 minutes old
-    };
-
-    // Get initial position with timeout
-    const timeoutId = setTimeout(() => {
-      if (!location) {
-        console.warn('Geolocation taking too long, trying fallback...');
-        // Try to use cached location as fallback
-        const cachedLocation = localStorage.getItem('userLocation');
-        if (cachedLocation) {
-          const parsed = JSON.parse(cachedLocation);
-          setLocation({ latitude: parsed.latitude, longitude: parsed.longitude });
-        }
-      }
-    }, 5000); // 5 seconds timeout
-
+    // Get current position
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        clearTimeout(timeoutId);
-        updateLocation(position);
+      async (position) => {
+        const newLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+
+        // Try to get address using reverse geocoding
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLocation.latitude}&lon=${newLocation.longitude}`
+          );
+          const data = await response.json();
+          newLocation.address = data.display_name;
+        } catch (error) {
+          console.error('Error getting address:', error);
+        }
+
+        setLocation(newLocation);
+        setLoadingLocation(false);
+        localStorage.setItem('userLocation', JSON.stringify(newLocation));
       },
       (error) => {
-        clearTimeout(timeoutId);
-        console.error('Error getting position:', error);
-        // Try to use cached location on error
-        const cachedLocation = localStorage.getItem('userLocation');
-        if (cachedLocation) {
-          const parsed = JSON.parse(cachedLocation);
-          setLocation({ latitude: parsed.latitude, longitude: parsed.longitude });
-        }
+        setError(error.message);
+        setLoadingLocation(false);
       },
-      options
-    );
-
-    // Watch for location changes
-    const watchId = navigator.geolocation.watchPosition(
-      updateLocation,
-      (error) => console.error('Error watching position:', error),
-      options
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
     );
 
     // Set up Pusher connection
@@ -114,13 +76,21 @@ const useLocation = () => {
     });
 
     return () => {
-      clearTimeout(timeoutId);
-      navigator.geolocation.clearWatch(watchId);
       pusher.unsubscribe('location-updates');
     };
   }, [session]);
 
-  return location;
+  return {
+    location,
+    loadingLocation,
+    error,
+    setLocation: (newLocation) => {
+      setLocation(newLocation);
+      if (newLocation) {
+        localStorage.setItem('userLocation', JSON.stringify(newLocation));
+      }
+    },
+  };
 };
 
 export default useLocation;
