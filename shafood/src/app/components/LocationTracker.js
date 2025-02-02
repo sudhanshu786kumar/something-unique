@@ -24,6 +24,7 @@ import PreferencesModal from './PreferencesModal';
 import NearbyUsersDrawer from './NearbyUsersDrawer';
 import Chat from './Chat';
 import ErrorBoundary from './ErrorBoundary';
+import CurrentLocationDisplay from './CurrentLocationDisplay';
 
 // Move getProviderIcon to the top level
 const getProviderIcon = (provider) => {
@@ -70,7 +71,7 @@ const QuickLocationInfo = ({ location }) => {
       <div className="flex items-center gap-4">
         <div className="p-4 bg-orange-100 dark:bg-orange-900 rounded-full">
           <FontAwesomeIcon 
-            icon={faMapMarkerAlt} 
+            icon={faLocationDot} 
             className="text-2xl text-orange-500 dark:text-orange-400" 
           />
         </div>
@@ -79,7 +80,7 @@ const QuickLocationInfo = ({ location }) => {
             Your Current Location
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+            {location.address || `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}
           </p>
         </div>
       </div>
@@ -263,30 +264,27 @@ const LocationTracker = ({
   userLocation,
   isPreferencesSet,
   initialPreferences,
+  hideLocation = false,
 }) => {
-  const [location, setLocation] = useState(userLocation);
-  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const { location, loadingLocation, error, setLocation } = useLocation() || {};
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [nearbyUsers, setNearbyUsers] = useState(initialNearbyUsers || []);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [userLocations, setUserLocations] = useState({});
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [activeChatId, setActiveChatId] = useState(null);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [searchComplete, setSearchComplete] = useState(false);
-  const [preferencesUpdated, setPreferencesUpdated] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
-  const [loadingLocation, setLoadingLocation] = useState(!userLocation);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [potentialUsers, setPotentialUsers] = useState([]);
-  const [searchButtonLoading, setSearchButtonLoading] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Update location when userLocation prop changes
   useEffect(() => {
     if (userLocation) {
-      setLocation(userLocation);
-      setLoadingLocation(false);
+      setLocation?.(userLocation);
     }
-  }, [userLocation]);
+    setLoading(false);
+  }, [userLocation, setLocation]);
 
   // Initialize map with proper dimensions
   const mapContainerStyle = {
@@ -305,14 +303,8 @@ const LocationTracker = ({
 
   // Handle map load success
   const handleMapLoaded = () => {
-    setIsMapLoaded(true);
+    setLoading(false);
   };
-
-  useEffect(() => {
-    if (location) {
-      setLoadingLocation(false);
-    }
-  }, [location]);
 
   useEffect(() => {
     if (session?.user) {
@@ -349,26 +341,25 @@ const LocationTracker = ({
   const handlePreferencesUpdate = (newPreferences) => {
     onUpdate(newPreferences);
     setPreferencesModalOpen(false);
-    setPreferencesUpdated(true);
   };
 
-  // Update the fetchNearbyUsers function to use the current location
+  // Update the fetchNearbyUsers function
   const fetchNearbyUsers = async () => {
     if (!location) return;
     
-    setSearchButtonLoading(true);
-    setSearchComplete(false);
     try {
       const foodProviders = preferences.foodProviders.join(',');
-      const priceRange = preferences.priceRange;
-      const url = `/api/users/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${preferences.locationRange || 7}&foodProviders=${foodProviders}&priceRange=${priceRange}`;
-      
-      console.log('Fetching nearby users with URL:', url); // Debug log
-      
-      const response = await fetch(url);
+      const params = new URLSearchParams({
+        latitude: location.latitude.toString(),
+        longitude: location.longitude.toString(),
+        radius: (preferences.locationRange || 7).toString(),
+        foodProviders,
+        priceRange: preferences.priceRange || '',
+        isGuest: (!session).toString()
+      });
+
+      const response = await fetch(`/api/users/nearby?${params}`);
       const data = await response.json();
-      
-      console.log('Nearby users response:', data); // Debug log
       
       if (response.ok) {
         const locationMap = {};
@@ -377,20 +368,21 @@ const LocationTracker = ({
             locationMap[user.id] = user.location;
           }
         });
+        
         setUserLocations(locationMap);
         setNearbyUsers(data);
         
-        // Only open drawer if users were found
         if (data.length > 0) {
-        setIsDrawerOpen(true);
+          setIsDrawerOpen(true);
+        } else {
+          toast.info('No nearby users found with matching preferences');
         }
+      } else {
+        throw new Error(data.error || 'Failed to fetch nearby users');
       }
     } catch (error) {
       console.error('Error fetching nearby users:', error);
-      toast.error('Failed to fetch nearby users');
-    } finally {
-      setSearchButtonLoading(false);
-      setSearchComplete(true);
+      toast.error('Failed to fetch nearby users. Please try again.');
     }
   };
 
@@ -520,67 +512,7 @@ const LocationTracker = ({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          <QuickLocationInfo location={location} />
-
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Map Section - Takes up 3 columns on large screens */}
-            <div className="lg:col-span-3 h-full">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
-                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-                  Location Map
-                </h2>
-                <div className="relative h-[400px] rounded-lg overflow-hidden" style={mapContainerStyle}>
-                  <ErrorBoundary>
-                    <Suspense fallback={<MapLoadingFallback />}>
-                      <CuteMap
-                        center={location ? [location.latitude, location.longitude] : null}
-                        nearbyUsers={nearbyUsers}
-                        onLoad={handleMapLoaded}
-                        onError={handleMapError}
-                        style={mapContainerStyle}
-                      />
-                    </Suspense>
-                  </ErrorBoundary>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions Section - Takes up 2 columns on large screens */}
-            <div className="lg:col-span-2 space-y-6">
-              <PreferencesSummary 
-                preferences={preferences}
-                nearbyUsers={nearbyUsers}
-                potentialUsers={potentialUsers}
-                onUpdateClick={() => setPreferencesModalOpen(true)}
-              />
-
-              {preferencesUpdated && (
-                <motion.button 
-                  onClick={fetchNearbyUsers}
-                  disabled={searchButtonLoading}
-                  className={`w-full bg-gradient-to-r ${
-                    searchButtonLoading 
-                      ? 'from-gray-400 to-gray-500 cursor-not-allowed'
-                      : 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
-                  } text-white font-bold py-4 px-6 rounded-xl transition duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3`}
-                  whileHover={!searchButtonLoading ? { scale: 1.02 } : {}}
-                  whileTap={!searchButtonLoading ? { scale: 0.98 } : {}}
-                >
-                  {searchButtonLoading ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <FontAwesomeIcon icon={faUserFriends} />
-                      Search Nearby Users
-                    </>
-                  )}
-                </motion.button>
-              )}
-            </div>
-          </div>
+          {!hideLocation && <QuickLocationInfo location={location} />}
 
           <PreferencesModal
             isOpen={preferencesModalOpen}

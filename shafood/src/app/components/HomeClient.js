@@ -262,26 +262,16 @@ export default function HomeClient({ steps }) {
 
   const handlePreferencesUpdate = async (newPreferences) => {
     try {
-      const response = await fetch('/api/users/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPreferences),
-      });
-
-      if (!response.ok) throw new Error('Failed to update preferences');
-
       localStorage.setItem('pendingPreferences', JSON.stringify(newPreferences));
       setPreferences(newPreferences);
       setShowPreferencesModal(false);
       
-      // Only redirect if both location and preferences are set
-      if (selectedLocation) {
-        router.push('/dashboard');
-        toast.success('All set! Redirecting to dashboard...');
-      }
+      // Simply redirect to dashboard without requiring login
+      router.push('/dashboard');
+      toast.success('Preferences saved! You can now search for nearby users.');
     } catch (error) {
       console.error('Error updating preferences:', error);
-      toast.error('Failed to update preferences');
+      toast.error('Failed to save preferences');
     }
   };
 

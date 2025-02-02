@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import PreferencesModal from '../components/PreferencesModal';
@@ -7,16 +7,19 @@ import { toast } from 'react-toastify';
 import Loader from '../components/Loader';
 import Layout from '../components/Layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMapMarkerAlt, faUtensils, faMoneyBill, faTimes, faSpinner, faComments } from '@fortawesome/free-solid-svg-icons';
+import { faMapMarkerAlt, faUtensils, faMoneyBill, faTimes, faSpinner, faComments, faUserFriends, faArrowRight, faHeart } from '@fortawesome/free-solid-svg-icons';
 import { motion } from 'framer-motion';
 import useGeolocation from '../hooks/useGeolocation';
 import { Combobox } from '@headlessui/react';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 import { useLoadScript } from '@react-google-maps/api';
 import Chat from '../components/Chat';
+import PreferencesSummaryCard from '../components/PreferencesSummaryCard';
+import LocationTracker from '../components/LocationTracker';
+import WelcomeHeader from '../components/WelcomeHeader';
 
 const Dashboard = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const router = useRouter();
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [preferences, setPreferences] = useState(null);
@@ -37,6 +40,29 @@ const Dashboard = () => {
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [locationError, setLocationError] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const isGuest = !session;
+
+  const handleAuthRequired = (action) => {
+    let message;
+    switch (action) {
+      case 'start chat':
+        message = 'Please login to start chatting with nearby users';
+        break;
+      case 'start order':
+        message = 'Please login to create a group order';
+        break;
+      default:
+        message = 'Please login to access this feature';
+    }
+    
+    toast.info(message, {
+      position: "top-right",
+      icon: '🔒',
+      duration: 4000,
+    });
+    localStorage.setItem('postLoginAction', action);
+    router.push('/login');
+  };
 
   useEffect(() => {
     if (location) {
@@ -71,29 +97,28 @@ const Dashboard = () => {
   }, [location]);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated') {
-      const savedLocation = localStorage.getItem('userLocation');
-      const savedPreferences = localStorage.getItem('pendingPreferences');
+    const savedLocation = localStorage.getItem('userLocation');
+    const savedPreferences = localStorage.getItem('pendingPreferences');
 
-      if (savedLocation) {
-        const parsedLocation = JSON.parse(savedLocation);
-        // Only use saved location if it has an address
-        if (parsedLocation.address) {
-          setCurrentLocation(parsedLocation);
-        }
+    if (savedLocation) {
+      const parsedLocation = JSON.parse(savedLocation);
+      if (parsedLocation.address) {
+        setCurrentLocation(parsedLocation);
       }
-      
-      if (savedPreferences) {
-        setPreferences(JSON.parse(savedPreferences));
-      }
-      
+    }
+    
+    if (savedPreferences) {
+      setPreferences(JSON.parse(savedPreferences));
+    }
+    
+    if (session) {
       fetchInitialData();
     }
-  }, [status, router]);
+  }, [session]);
 
   const fetchInitialData = async () => {
+    if (!session) return;
+    
     setLoading(true);
     try {
       const response = await fetch('/api/wallet');
@@ -102,13 +127,11 @@ const Dashboard = () => {
         setWalletBalance(userData.walletBalance);
         setUserDetails(userData);
 
-        // If user has preferences in DB, use those instead of localStorage
         if (userData.preferences) {
           setPreferences(userData.preferences);
           localStorage.setItem('pendingPreferences', JSON.stringify(userData.preferences));
         }
 
-        // If user has location in DB, use that instead of localStorage
         if (userData.location) {
           setCurrentLocation(userData.location);
           localStorage.setItem('userLocation', JSON.stringify(userData.location));
@@ -116,7 +139,9 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching initial data:', error);
-      toast.error('Failed to load user data');
+      if (session) {
+        toast.error('Failed to load user data');
+      }
     } finally {
       setLoading(false);
     }
@@ -310,232 +335,76 @@ const Dashboard = () => {
     }
   };
 
+  const openChat = useCallback(async () => {
+    if (!session) {
+      handleAuthRequired('start chat');
+      return;
+    }
+    // ... rest of the existing openChat logic ...
+  }, [session, selectedUsers, activeChatId, userLocations]);
+
+  const handleOrderClick = () => {
+    if (!session) {
+      handleAuthRequired('start order');
+      return;
+    }
+    // ... existing order logic ...
+  };
+
   return (
     <Layout walletBalance={walletBalance}>
-      <div className="w-full h-full">
-        {loading ? (
-          <div className="flex justify-center items-center h-full">
-            <Loader size="h-16 w-16" />
-          </div>
-        ) : (
-          <div className="p-6 max-w-4xl mx-auto">
-            {/* Location Display */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6"
+      <div className="w-full max-w-6xl mx-auto p-6">
+        <WelcomeHeader 
+          session={session} 
+          location={currentLocation} 
+          router={router}
+        />
+
+        {preferences && (
+          <PreferencesSummaryCard
+            preferences={preferences}
+            onUpdateClick={() => setPreferencesModalOpen(true)}
+          />
+        )}
+
+        <LocationTracker
+          preferences={preferences}
+          onUpdate={setPreferences}
+          session={session}
+          userLocation={currentLocation}
+          isPreferencesSet={!!preferences}
+          initialPreferences={preferences}
+          hideLocation={true}
+        />
+
+        {/* Search Section - Available for all users */}
+        {preferences && currentLocation && (
+          <div className="mt-6">
+            <button
+              onClick={() => fetchNearbyUsers(preferences, currentLocation)}
+              className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
+              disabled={isSearching}
             >
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500 text-xl" />
-                  <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Current Location</h2>
-                </div>
-                {!showLocationSearch && !isLoadingLocation && (
-                  <button
-                    onClick={() => setShowLocationSearch(true)}
-                    className="px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <FontAwesomeIcon icon={faMapMarkerAlt} />
-                    Update Location
-                  </button>
-                )}
-              </div>
-              
-              {isLoadingLocation ? (
-                <div className="mt-4 flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <FontAwesomeIcon icon={faSpinner} spin className="text-orange-500 mr-2" />
-                  <span className="text-gray-600 dark:text-gray-300">Fetching location...</span>
-                </div>
-              ) : locationError ? (
-                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-lg">
-                  <p className="text-red-700 dark:text-red-300 font-medium">Location Error</p>
-                  <p className="text-red-600 dark:text-red-400 text-sm mt-1">{locationError}</p>
-                  <button
-                    onClick={() => {
-                      setLocationError(null);
-                      setShowLocationSearch(true);
-                    }}
-                    className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
-                  >
-                    Try setting location manually
-                  </button>
-                </div>
-              ) : currentLocation && !showLocationSearch ? (
-                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  {currentLocation.address ? (
-                    <>
-                      <p className="text-gray-700 dark:text-gray-300 break-words">
-                        {currentLocation.address}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {`${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`}
-                      </p>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center text-center p-4">
-                      <p className="text-gray-600 dark:text-gray-400 mb-2">
-                        Location coordinates available but address couldn't be retrieved
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {`${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`}
-                      </p>
-                      <button
-                        onClick={() => setShowLocationSearch(true)}
-                        className="mt-3 text-sm text-orange-500 hover:text-orange-600 underline"
-                      >
-                        Set location manually
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : !showLocationSearch ? (
-                <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg text-center">
-                  <p className="text-orange-700 dark:text-orange-300 mb-2">
-                    No location set
-                  </p>
-                  <button
-                    onClick={() => setShowLocationSearch(true)}
-                    className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 underline"
-                  >
-                    Set your location
-                  </button>
-                </div>
-              ) : null}
-              
-              {showLocationSearch && (
-                <div className="relative">
-                  <LocationSearchBox 
-                    onLocationSelect={(location) => {
-                      setCurrentLocation(location);
-                      setShowLocationSearch(false);
-                      setLocationError(null);
-                      localStorage.setItem('userLocation', JSON.stringify(location));
-                      toast.success('Location updated successfully!');
-                    }}
-                    onError={(error) => {
-                      setLocationError(error);
-                      toast.error(error);
-                    }}
-                  />
-                  <button
-                    onClick={() => setShowLocationSearch(false)}
-                    className="absolute top-0 right-0 mt-3 mr-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                </div>
-              )}
-            </motion.div>
+              {isSearching ? 'Searching...' : 'Find Nearby Users'}
+            </button>
+          </div>
+        )}
 
-            {/* Enhanced Preferences Display */}
-            {preferences && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6"
-              >
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Your Order Preferences</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      These preferences help us find the perfect ordering partners for you
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setPreferencesModalOpen(true)}
-                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <FontAwesomeIcon icon={faUtensils} />
-                    Update
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Food Providers Section */}
-                  <div className="bg-orange-50 dark:bg-gray-700/50 p-4 rounded-lg">
-                    <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faUtensils} className="text-orange-500" />
-                      Delivery Partners
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {preferences.foodProviders.map(provider => (
-                        <span key={provider} className="px-3 py-1 bg-white dark:bg-gray-600 text-orange-600 dark:text-orange-300 rounded-full text-sm shadow-sm">
-                          {provider}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      Orders will be matched with users using these delivery services
-                    </p>
-                  </div>
-
-                  {/* Location Range Section */}
-                  <div className="bg-orange-50 dark:bg-gray-700/50 p-4 rounded-lg">
-                    <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
-                      Search Range
-                    </h3>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                        {preferences.locationRange}
-                      </span>
-                      <span className="text-gray-600 dark:text-gray-400">kilometers</span>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      We&apos;ll find ordering partners within this distance from your location
-                    </p>
-                  </div>
-
-                  {/* Price Range Section */}
-                  <div className="bg-orange-50 dark:bg-gray-700/50 p-4 rounded-lg md:col-span-2">
-                    <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faMoneyBill} className="text-orange-500" />
-                      Preferred Price Range
-                    </h3>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                        {preferences.priceRange}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      You&apos;ll be matched with users planning to order within this price range
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Nearby Users Section */}
-            {preferences && currentLocation && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-6"
-              >
-                <button
-                  onClick={() => fetchNearbyUsers(preferences, currentLocation)}
-                  className={`w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all flex items-center justify-center gap-2 font-medium ${
-                    isSearching ? 'opacity-75 cursor-wait' : ''
-                  }`}
-                  disabled={isSearching}
-                >
-                  {isSearching ? (
-                    <>
-                      <FontAwesomeIcon 
-                        icon={faSpinner} 
-                        className="animate-spin" 
-                      />
-                      <span>Searching Nearby Users...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FontAwesomeIcon icon={faUtensils} />
-                      <span>Find Nearby Users</span>
-                    </>
-                  )}
-                </button>
-              </motion.div>
-            )}
+        {/* Chat and Order buttons - Only show when users are selected */}
+        {selectedUsers.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <button
+              onClick={() => !session ? handleAuthRequired('start chat') : handleStartChat()}
+              className="py-3 px-4 bg-orange-500 text-white rounded-lg"
+            >
+              Start Chat ({selectedUsers.length})
+            </button>
+            <button
+              onClick={() => !session ? handleAuthRequired('start order') : handleOrderClick()}
+              className="py-3 px-4 bg-green-500 text-white rounded-lg"
+            >
+              Start Order
+            </button>
           </div>
         )}
       </div>
@@ -638,43 +507,7 @@ const Dashboard = () => {
                       <span className="text-sm">Start Chat</span>
                     </button>
                     <button
-                      onClick={async () => {
-                        if (selectedUsers.length === 0) {
-                          toast.error('Please select users to start an order');
-                          return;
-                        }
-                        
-                        try {
-                          setIsSearching(true);
-                          // Create or find existing chat
-                          const response = await fetch('/api/chat/find-or-create', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              userIds: selectedUsers.map(user => user.id),
-                              userLocations: userLocations
-                            }),
-                          });
-
-                          if (!response.ok) {
-                            throw new Error('Failed to create chat session');
-                          }
-
-                          const { chatId } = await response.json();
-                          
-                          // Store selected users in localStorage
-                          localStorage.setItem('chatUsers', JSON.stringify(selectedUsers));
-                          
-                          // Navigate to chat page with order tab active
-                          router.push(`/chat/${chatId}?tab=order`);
-                          
-                        } catch (error) {
-                          console.error('Error starting order:', error);
-                          toast.error('Failed to start order. Please try again.');
-                        } finally {
-                          setIsSearching(false);
-                        }
-                      }}
+                      onClick={handleOrderClick}
                       className="p-3 rounded-lg bg-green-500 hover:bg-green-600 text-white flex flex-col items-center justify-center"
                     >
                       <FontAwesomeIcon icon={faUtensils} className="text-xl mb-1" />

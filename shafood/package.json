@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:socket": "node server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -37,10 +38,13 @@
     "pusher-js": "^8.4.0-rc2",
     "react": "^18",
     "react-dom": "^18",
+    "react-hot-toast": "^2.5.1",
     "react-intersection-observer": "^9.13.1",
     "react-lottie-player": "^2.1.0",
     "react-toastify": "^10.0.5",
     "resend": "^4.0.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "swr": "^2.2.5",
     "use-places-autocomplete": "^4.0.1"
   },

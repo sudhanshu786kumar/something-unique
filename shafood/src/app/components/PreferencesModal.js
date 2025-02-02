@@ -40,11 +40,6 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!session?.user?.id) {
-      toast.error('User session not found');
-      return;
-    }
-
     // Validate preferences before sending
     if (preferences.foodProviders.length === 0) {
       toast.error('Please select at least one food provider');
@@ -57,42 +52,15 @@ const PreferencesModal = ({ isOpen, onClose, onUpdate, userLocation, className }
     }
 
     try {
-      const response = await fetch('/api/users/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          foodProviders: preferences.foodProviders,
-          priceRange: preferences.priceRange,
-          locationRange: Number(preferences.locationRange)
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Preferences update failed:', errorData);
-        throw new Error(errorData.error || 'Failed to update preferences');
-      }
-
-      const data = await response.json();
-      onUpdate(preferences);
-      toast.success('Preferences updated successfully!', {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+      // Call onUpdate with the new preferences
+      onUpdate({
+        foodProviders: preferences.foodProviders,
+        priceRange: preferences.priceRange,
+        locationRange: Number(preferences.locationRange)
       });
     } catch (error) {
       console.error('Error updating preferences:', error);
-      toast.error(error.message || 'Failed to update preferences', {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+      toast.error('Failed to update preferences');
     }
   };
 
