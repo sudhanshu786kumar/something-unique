@@ -14,9 +14,9 @@ export default function HomeStatic() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-red-100">
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-800 dark:to-black">
       <HomeClient steps={steps} />
-      <footer className="bg-orange-600 text-white py-10">
+      <footer className="bg-orange-600 text-white py-10 dark:bg-gray-900">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
