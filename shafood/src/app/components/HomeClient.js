@@ -18,6 +18,8 @@ const FeatureCard = lazy(() => import('./FeatureCard'))
 import savingMoneyAnimation from '../animations/saving-money.json'
 import orderTogetherAnimation from '../animations/order-together.json'
 import chatAnimation from '../animations/chat.json'
+import DarkModeToggle from './DarkModeToggle'
+import { ThemeProvider } from 'next-themes'
 
 // Add new component for skeleton loader
 const LocationSkeleton = () => (
@@ -128,7 +130,7 @@ const LocationSearchBox = ({ handleLocationSelect, isFocused, setIsFocused }) =>
   }, [isFocused, address]);
 
   return (
-    <div className="relative w-full max-w-md mx-auto">
+    <div className="relative w-full max-w-md mx-auto  ">
       <div className="relative">
         <input
           type="text"
@@ -292,8 +294,9 @@ export default function HomeClient({ steps }) {
 
   return (
     <>
-      <div className="relative">
-        <header className="py-4 px-4 md:px-12 bg-white bg-opacity-90 shadow-md sticky top-0 z-[5]">
+     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+     <div className="relative ">
+        <header className="py-4 px-4 md:px-12 bg-white bg-opacity-90 shadow-md sticky top-0 z-[5] dark:bg-gray-900">
           <div className="container mx-auto flex justify-between items-center">
             <motion.h1 
               initial={{ opacity: 0, x: -50 }}
@@ -303,7 +306,7 @@ export default function HomeClient({ steps }) {
             >
               ShaFood
             </motion.h1>
-            <nav className="hidden md:block">
+            <nav className="hidden md:block ">
               <motion.ul 
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -313,6 +316,8 @@ export default function HomeClient({ steps }) {
                 <li><Link href="#how-it-works" className="text-orange-600 hover:text-orange-700 font-semibold">How It Works</Link></li>
                 <li><Link href="#features" className="text-orange-600 hover:text-orange-700 font-semibold">Features</Link></li>
                 <li><Link href="/contact" className="text-orange-600 hover:text-orange-700 font-semibold">Contact</Link></li>
+                <li>  <DarkModeToggle />
+                </li>
               </motion.ul>
             </nav>
             <button 
@@ -467,6 +472,8 @@ export default function HomeClient({ steps }) {
           </section>
         </main>
       </div>
+     </ThemeProvider>
+   
     </>
   )
 }
