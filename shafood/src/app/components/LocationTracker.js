@@ -1,30 +1,30 @@
-'use client';
-import { useCallback, useEffect, useState, Suspense } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import useLocation from '../hooks/useGeolocation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faMapMarkerAlt, 
-  faUtensils, 
-  faShoppingBasket, 
-  faCartPlus, 
-  faUserFriends, 
+'use client'
+import { useCallback, useEffect, useState, Suspense } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import useLocation from '../hooks/useGeolocation'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faMapMarkerAlt,
+  faUtensils,
+  faShoppingBasket,
+  faCartPlus,
+  faUserFriends,
   faComments,
   faLocationDot,
   faMoneyBill,
   faSpinner,
-  faClock
-} from '@fortawesome/free-solid-svg-icons';
-import SearchAnimation from './SearchAnimation';
-import { toast } from 'react-toastify';
-import dynamic from 'next/dynamic';
-import PreferencesModal from './PreferencesModal';
-import NearbyUsersDrawer from './NearbyUsersDrawer';
-import Chat from './Chat';
-import ErrorBoundary from './ErrorBoundary';
-import CurrentLocationDisplay from './CurrentLocationDisplay';
+  faClock,
+} from '@fortawesome/free-solid-svg-icons'
+import SearchAnimation from './SearchAnimation'
+import { toast } from 'react-toastify'
+import dynamic from 'next/dynamic'
+import PreferencesModal from './PreferencesModal'
+import NearbyUsersDrawer from './NearbyUsersDrawer'
+import Chat from './Chat'
+import ErrorBoundary from './ErrorBoundary'
+import CurrentLocationDisplay from './CurrentLocationDisplay'
 
 // Move getProviderIcon to the top level
 const getProviderIcon = (provider) => {
@@ -32,35 +32,32 @@ const getProviderIcon = (provider) => {
     Zomato: <FontAwesomeIcon icon={faUtensils} />,
     Swiggy: <FontAwesomeIcon icon={faShoppingBasket} />,
     Zepto: <FontAwesomeIcon icon={faCartPlus} />,
-  };
-  return providerIcons[provider] || <FontAwesomeIcon icon={faUtensils} />;
-};
+  }
+  return providerIcons[provider] || <FontAwesomeIcon icon={faUtensils} />
+}
 
 // Lazy load the map component with no SSR
-const CuteMap = dynamic(
-  () => import('./CuteMap').then(mod => mod.default),
-  { 
-    loading: () => <MapLoadingFallback />,
-    ssr: false 
-  }
-);
+const CuteMap = dynamic(() => import('./CuteMap').then((mod) => mod.default), {
+  loading: () => <MapLoadingFallback />,
+  ssr: false,
+})
 
 const MapLoadingFallback = () => (
   <div className="relative w-full h-[400px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
     <div className="absolute inset-0 flex items-center justify-center">
       <div className="text-center space-y-3">
-        <FontAwesomeIcon 
-          icon={faLocationDot} 
-          className="text-4xl text-orange-500 mb-2 animate-bounce" 
+        <FontAwesomeIcon
+          icon={faLocationDot}
+          className="text-4xl text-orange-500 mb-2 animate-bounce"
         />
         <p className="text-gray-500 dark:text-gray-400">Loading map...</p>
       </div>
     </div>
   </div>
-);
+)
 
 const QuickLocationInfo = ({ location }) => {
-  if (!location) return null;
+  if (!location) return null
 
   return (
     <motion.div
@@ -70,9 +67,9 @@ const QuickLocationInfo = ({ location }) => {
     >
       <div className="flex items-center gap-4">
         <div className="p-4 bg-orange-100 dark:bg-orange-900 rounded-full">
-          <FontAwesomeIcon 
-            icon={faLocationDot} 
-            className="text-2xl text-orange-500 dark:text-orange-400" 
+          <FontAwesomeIcon
+            icon={faLocationDot}
+            className="text-2xl text-orange-500 dark:text-orange-400"
           />
         </div>
         <div>
@@ -80,15 +77,23 @@ const QuickLocationInfo = ({ location }) => {
             Your Current Location
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {location.address || `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}
+            {location.address ||
+              `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(
+                6
+              )}`}
           </p>
         </div>
       </div>
     </motion.div>
-  );
-};
+  )
+}
 
-const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potentialUsers }) => {
+const PreferencesSummary = ({
+  preferences,
+  nearbyUsers,
+  onUpdateClick,
+  potentialUsers,
+}) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -114,8 +119,8 @@ const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potential
         {/* Current Settings */}
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {preferences.foodProviders.map(provider => (
-              <span 
+            {preferences.foodProviders.map((provider) => (
+              <span
                 key={provider}
                 className="px-3 py-1 bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300 rounded-full text-sm flex items-center gap-2"
               >
@@ -147,9 +152,9 @@ const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potential
           <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 p-4 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 dark:bg-green-800 rounded-full">
-                <FontAwesomeIcon 
-                  icon={faUserFriends} 
-                  className="text-green-600 dark:text-green-400" 
+                <FontAwesomeIcon
+                  icon={faUserFriends}
+                  className="text-green-600 dark:text-green-400"
                 />
               </div>
               <div>
@@ -167,9 +172,9 @@ const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potential
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 p-4 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-full">
-                <FontAwesomeIcon 
-                  icon={faUserFriends} 
-                  className="text-blue-600 dark:text-blue-400" 
+                <FontAwesomeIcon
+                  icon={faUserFriends}
+                  className="text-blue-600 dark:text-blue-400"
                 />
               </div>
               <div>
@@ -192,15 +197,24 @@ const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potential
             </p>
             <ul className="space-y-2 text-sm text-orange-600 dark:text-orange-300">
               <li className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  className="text-orange-500"
+                />
                 Increase your location range
               </li>
               <li className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faUtensils} className="text-orange-500" />
+                <FontAwesomeIcon
+                  icon={faUtensils}
+                  className="text-orange-500"
+                />
                 Add more food providers
               </li>
               <li className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faMoneyBill} className="text-orange-500" />
+                <FontAwesomeIcon
+                  icon={faMoneyBill}
+                  className="text-orange-500"
+                />
                 Adjust your price range
               </li>
             </ul>
@@ -208,8 +222,8 @@ const PreferencesSummary = ({ preferences, nearbyUsers, onUpdateClick, potential
         )}
       </div>
     </motion.div>
-  );
-};
+  )
+}
 
 const NoUsersFound = ({ preferences }) => (
   <motion.div
@@ -220,16 +234,17 @@ const NoUsersFound = ({ preferences }) => (
   >
     <div className="text-center space-y-4">
       <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-        <FontAwesomeIcon 
-          icon={faUserFriends} 
-          className="text-2xl text-orange-500 dark:text-orange-400" 
+        <FontAwesomeIcon
+          icon={faUserFriends}
+          className="text-2xl text-orange-500 dark:text-orange-400"
         />
       </div>
       <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
         No Nearby Users Found
       </h3>
       <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-        We couldn&apos;t find any users within {preferences.locationRange}km who match your preferences.
+        We couldn&apos;t find any users within {preferences.locationRange}km who
+        match your preferences.
       </p>
       <div className="pt-4 space-y-2">
         <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
@@ -237,12 +252,17 @@ const NoUsersFound = ({ preferences }) => (
         </p>
         <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
           <li className="flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faMapMarkerAlt} className="text-orange-500" />
-            Increase your location range (currently {preferences.locationRange}km)
+            <FontAwesomeIcon
+              icon={faMapMarkerAlt}
+              className="text-orange-500"
+            />
+            Increase your location range (currently {preferences.locationRange}
+            km)
           </li>
           <li className="flex items-center justify-center gap-2">
             <FontAwesomeIcon icon={faUtensils} className="text-orange-500" />
-            Add more food providers (currently {preferences.foodProviders.length})
+            Add more food providers (currently{' '}
+            {preferences.foodProviders.length})
           </li>
           <li className="flex items-center justify-center gap-2">
             <FontAwesomeIcon icon={faClock} className="text-orange-500" />
@@ -252,13 +272,13 @@ const NoUsersFound = ({ preferences }) => (
       </div>
     </div>
   </motion.div>
-);
+)
 
-const LocationTracker = ({ 
-  preferences, 
-  onUpdate, 
-  session, 
-  initialNearbyUsers, 
+const LocationTracker = ({
+  preferences,
+  onUpdate,
+  session,
+  initialNearbyUsers,
   loadingNearbyUsers,
   setLoadingNearbyUsers,
   userLocation,
@@ -266,25 +286,25 @@ const LocationTracker = ({
   initialPreferences,
   hideLocation = false,
 }) => {
-  const { location, loadingLocation, error, setLocation } = useLocation() || {};
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [nearbyUsers, setNearbyUsers] = useState(initialNearbyUsers || []);
-  const [selectedUsers, setSelectedUsers] = useState([]);
-  const [userLocations, setUserLocations] = useState({});
-  const [showChat, setShowChat] = useState(false);
-  const [activeChatId, setActiveChatId] = useState(null);
-  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
-  const [searchComplete, setSearchComplete] = useState(false);
-  const [potentialUsers, setPotentialUsers] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { location, loadingLocation, error, setLocation } = useLocation() || {}
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [nearbyUsers, setNearbyUsers] = useState(initialNearbyUsers || [])
+  const [selectedUsers, setSelectedUsers] = useState([])
+  const [userLocations, setUserLocations] = useState({})
+  const [showChat, setShowChat] = useState(false)
+  const [activeChatId, setActiveChatId] = useState(null)
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false)
+  const [searchComplete, setSearchComplete] = useState(false)
+  const [potentialUsers, setPotentialUsers] = useState([])
+  const [onlineUsers, setOnlineUsers] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (userLocation) {
-      setLocation?.(userLocation);
+      setLocation?.(userLocation)
     }
-    setLoading(false);
-  }, [userLocation, setLocation]);
+    setLoading(false)
+  }, [userLocation, setLocation])
 
   // Initialize map with proper dimensions
   const mapContainerStyle = {
@@ -292,136 +312,148 @@ const LocationTracker = ({
     height: '400px',
     position: 'relative',
     borderRadius: '0.5rem',
-    overflow: 'hidden'
-  };
+    overflow: 'hidden',
+  }
 
   // Add error handling for map loading
   const handleMapError = (error) => {
-    console.error('Map loading error:', error);
-    toast.error('Failed to load map. Please refresh the page.');
-  };
+    console.error('Map loading error:', error)
+    toast.error('Failed to load map. Please refresh the page.')
+  }
 
   // Handle map load success
   const handleMapLoaded = () => {
-    setLoading(false);
-  };
+    setLoading(false)
+  }
 
   useEffect(() => {
     if (session?.user) {
       const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
         authEndpoint: '/api/pusher/auth',
-      });
+      })
 
-      const channel = pusher.subscribe('presence-online');
-      
+      const channel = pusher.subscribe('presence-online')
+
       channel.bind('pusher:subscription_succeeded', (members) => {
-        setOnlineUsers(new Set(Object.keys(members.members)));
-      });
+        setOnlineUsers(new Set(Object.keys(members.members)))
+      })
 
       channel.bind('pusher:member_added', (member) => {
-        setOnlineUsers(prev => new Set([...prev, member.id]));
-      });
+        setOnlineUsers((prev) => new Set([...prev, member.id]))
+      })
 
       channel.bind('pusher:member_removed', (member) => {
-        setOnlineUsers(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(member.id);
-          return newSet;
-        });
-      });
+        setOnlineUsers((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(member.id)
+          return newSet
+        })
+      })
 
       return () => {
-        channel.unbind_all();
-        pusher.unsubscribe('presence-online');
-      };
+        channel.unbind_all()
+        pusher.unsubscribe('presence-online')
+      }
     }
-  }, [session]);
+  }, [session])
 
   const handlePreferencesUpdate = (newPreferences) => {
-    onUpdate(newPreferences);
-    setPreferencesModalOpen(false);
-  };
+    onUpdate(newPreferences)
+    setPreferencesModalOpen(false)
+  }
 
   // Update the fetchNearbyUsers function
   const fetchNearbyUsers = async () => {
-    if (!location) return;
-    
+    if (!location) return
+
     try {
-      const foodProviders = preferences.foodProviders.join(',');
+      const foodProviders = preferences.foodProviders.join(',')
       const params = new URLSearchParams({
         latitude: location.latitude.toString(),
         longitude: location.longitude.toString(),
         radius: (preferences.locationRange || 7).toString(),
         foodProviders,
         priceRange: preferences.priceRange || '',
-        isGuest: (!session).toString()
-      });
+        isGuest: (!session).toString(),
+      })
 
-      const response = await fetch(`/api/users/nearby?${params}`);
-      const data = await response.json();
-      
+      const response = await fetch(`/api/users/nearby?${params}`)
+      const data = await response.json()
+
       if (response.ok) {
-        const locationMap = {};
-        data.forEach(user => {
+        const locationMap = {}
+        data.forEach((user) => {
           if (user.location) {
-            locationMap[user.id] = user.location;
+            locationMap[user.id] = user.location
           }
-        });
-        
-        setUserLocations(locationMap);
-        setNearbyUsers(data);
-        
+        })
+
+        setUserLocations(locationMap)
+        setNearbyUsers(data)
+
         if (data.length > 0) {
-          setIsDrawerOpen(true);
+          setIsDrawerOpen(true)
         } else {
-          toast.info('No nearby users found with matching preferences');
+          toast.info('No nearby users found with matching preferences')
         }
       } else {
-        throw new Error(data.error || 'Failed to fetch nearby users');
+        throw new Error(data.error || 'Failed to fetch nearby users')
       }
     } catch (error) {
-      console.error('Error fetching nearby users:', error);
-      toast.error('Failed to fetch nearby users. Please try again.');
+      console.error('Error fetching nearby users:', error)
+      toast.error('Failed to fetch nearby users. Please try again.')
     }
-  };
+  }
 
-  const handleUserSelection = useCallback((user) => {
-    setSelectedUsers((prevSelectedUsers) => {
-      const isAlreadySelected = prevSelectedUsers.some(
-        (selectedUser) => selectedUser.id === user.id
-      );
+  const handleUserSelection = useCallback(
+    (user) => {
+      setSelectedUsers((prevSelectedUsers) => {
+        const isAlreadySelected = prevSelectedUsers.some(
+          (selectedUser) => selectedUser.id === user.id
+        )
 
-      if (session?.user?.id === user.id) {
-        return prevSelectedUsers;
-      }
+        if (session?.user?.id === user.id) {
+          return prevSelectedUsers
+        }
 
-      if (isAlreadySelected) {
-        return prevSelectedUsers.filter(
-          (selectedUser) => selectedUser.id !== user.id
-        );
-      } else {
-        return [...prevSelectedUsers, user];
-      }
-    });
-  }, [session]);
+        if (isAlreadySelected) {
+          return prevSelectedUsers.filter(
+            (selectedUser) => selectedUser.id !== user.id
+          )
+        } else {
+          return [...prevSelectedUsers, user]
+        }
+      })
+    },
+    [session]
+  )
 
   const openChat = useCallback(async () => {
     if (selectedUsers.length > 0) {
-      const filteredUsers = selectedUsers.filter(user => user.id !== session?.user?.id);
-      
+      const filteredUsers = selectedUsers.filter(
+        (user) => user.id !== session?.user?.id
+      )
+
       if (!filteredUsers.length) {
         toast.error('Please select users to chat with', {
-          position: "top-right",
-        });
-        return;
+          position: 'top-right',
+        })
+        return
       }
 
-      const usersWithoutLocation = filteredUsers.filter(user => !userLocations[user.id]);
+      const usersWithoutLocation = filteredUsers.filter(
+        (user) => !userLocations[user.id]
+      )
       if (usersWithoutLocation.length > 0) {
-        toast.warning(`Some users haven't shared their location yet: ${usersWithoutLocation.map(u => u.name).join(', ')}`, {
-          position: "top-right",
-        });
+        toast.warning(
+          `Some users haven't shared their location yet: ${usersWithoutLocation
+            .map((u) => u.name)
+            .join(', ')}`,
+          {
+            position: 'top-right',
+          }
+        )
       }
 
       if (!activeChatId) {
@@ -429,66 +461,70 @@ const LocationTracker = ({
           const response = await fetch('/api/chat/find-or-create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              userIds: filteredUsers.map(u => u.id),
-              userLocations: userLocations
+            body: JSON.stringify({
+              userIds: filteredUsers.map((u) => u.id),
+              userLocations: userLocations,
             }),
-          });
+          })
 
           if (response.ok) {
-            const { chatId } = await response.json();
-            setActiveChatId(chatId);
+            const { chatId } = await response.json()
+            setActiveChatId(chatId)
             setTimeout(() => {
-              setShowChat(true);
-            }, 50);
+              setShowChat(true)
+            }, 50)
           } else {
-            throw new Error('Failed to create chat session');
+            throw new Error('Failed to create chat session')
           }
         } catch (error) {
-          console.error('Error opening chat:', error);
+          console.error('Error opening chat:', error)
           toast.error('Failed to open chat. Please try again.', {
-            position: "top-right",
-          });
+            position: 'top-right',
+          })
         }
       } else {
         setTimeout(() => {
-          setShowChat(true);
-        }, 50);
+          setShowChat(true)
+        }, 50)
       }
     } else {
       toast.error('Please select users to chat with', {
-        position: "top-right",
-      });
+        position: 'top-right',
+      })
     }
-  }, [selectedUsers, session, activeChatId, userLocations]);
+  }, [selectedUsers, session, activeChatId, userLocations])
 
   useEffect(() => {
     return () => {
-      setActiveChatId(null);
-      setShowChat(false);
-    };
-  }, []);
+      setActiveChatId(null)
+      setShowChat(false)
+    }
+  }, [])
 
   const fetchPotentialUsers = async () => {
-    if (!location) return;
-    
+    if (!location) return
+
     try {
-      const response = await fetch(`/api/users/potential?latitude=${location.latitude}&longitude=${location.longitude}&radius=${(preferences.locationRange || 7) + 5}`);
+      const response = await fetch(
+        `/api/users/potential?latitude=${location.latitude}&longitude=${
+          location.longitude
+        }&radius=${(preferences.locationRange || 7) + 5}`
+      )
       if (response.ok) {
-        const data = await response.json();
-        setPotentialUsers(data);
+        const data = await response.json()
+        setPotentialUsers(data)
         console.log(data)
       }
     } catch (error) {
-      console.error('Error fetching potential users:', error);
+      console.error('Error fetching potential users:', error)
     }
-  };
+  }
 
   useEffect(() => {
     if (location) {
-      fetchPotentialUsers();
+      fetchPotentialUsers()
     }
-  }, [location, preferences]);
+  }, [location, preferences])
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
@@ -498,9 +534,9 @@ const LocationTracker = ({
           animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center min-h-[60vh]"
         >
-          <FontAwesomeIcon 
-            icon={faLocationDot} 
-            className="text-6xl text-orange-500 animate-bounce mb-6" 
+          <FontAwesomeIcon
+            icon={faLocationDot}
+            className="text-6xl text-orange-500 animate-bounce mb-6"
           />
           <p className="text-lg text-gray-600 dark:text-gray-400">
             Getting your location...
@@ -563,9 +599,7 @@ const LocationTracker = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default LocationTracker;
-
-
+export default LocationTracker
