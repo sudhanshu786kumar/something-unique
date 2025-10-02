@@ -6,7 +6,7 @@
 
 Shafood is a cutting-edge food ordering sharing platform that's transforming the landscape of food delivery. By connecting users and consolidating orders, we're making food delivery more affordable, sustainable, and community-driven.
 
-🌐 **[Check out Shafood](https://freeshafood.vercel.app/)**
+🌐 **[Check out Shafood](https://www.freshafood.online/)**
 
 ## ✨ Key Features
 
