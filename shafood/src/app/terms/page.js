@@ -1,22 +1,20 @@
-'use client';
-
-import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
+
+const AnimatedCard = dynamic(() => import('./AnimatedCard.client'), {
+  ssr: false,
+  loading: () => <div className="bg-white p-8 rounded-xl shadow-2xl" />,
+});
 
 export default function TermsAndConditions() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 to-red-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white p-8 rounded-xl shadow-2xl"
-        >
+        <AnimatedCard className="bg-white p-8 rounded-xl shadow-2xl">
           <Link href="/" className="text-2xl font-bold text-orange-600 mb-6 block">ShaFood</Link>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">Terms & Conditions</h1>
           <p className="text-sm text-gray-600 mb-6">Last updated on 20-10-2024 11:23:58</p>
-          
+
           <div className="space-y-4 text-gray-700">
             <p>
               These Terms and Conditions, along with privacy policy or other terms (&quot;Terms&quot;) constitute a binding
@@ -69,13 +67,15 @@ export default function TermsAndConditions() {
               <li>All concerns or communications relating to these Terms must be communicated to us using the
                 contact information provided on this website.</li>
             </ul>
+
           </div>
 
           <footer className="text-center mt-8 text-sm text-gray-600">
             <p>&copy; {new Date().getFullYear()} ShaFood. All rights reserved.</p>
           </footer>
-        </motion.div>
+
+        </AnimatedCard>
       </div>
-    </div>
+        </div>
   );
 }
