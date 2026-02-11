@@ -19,7 +19,7 @@
     "@headlessui/react": "^2.1.8",
     "@heroicons/react": "^2.1.5",
     "@react-google-maps/api": "^2.20.3",
-    "axios": "^1.7.7",
+    "axios": "^1.8.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.0",
     "dompurify": "^3.1.7",
